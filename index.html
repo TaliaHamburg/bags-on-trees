@@ -1,0 +1,2251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bags on trees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.are.na" crossorigin>
+<link rel="preconnect" href="https://data.cityofnewyork.us" crossorigin>
+<link rel="dns-prefetch" href="https://attachments.are.na">
+<link rel="dns-prefetch" href="https://images.are.na">
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@300,400,500,600&f[]=gambarino@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFFFFA;
+    --ink: #000000;
+    --grey-2: #333;
+    --grey-3: #666;
+    --grey-4: #c8c5be;
+    --accent: #B7CEFF;
+    --tree-1: #D1A98C;
+    --tree-2: #DCC3B3;
+    --tree-3: #A99586;
+    --font-sans: 'Switzer', -apple-system, 'Helvetica Neue', sans-serif;
+    --font-serif: 'Gambarino', Georgia, serif;
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    cursor: none;
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     SHARED NAVIGATION
+     ────────────────────────────────────────────────────────────── */
+  nav.top {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 80;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: clamp(1rem, 2.5vh, 1.6rem) clamp(1.5rem, 4vw, 2.5rem);
+    pointer-events: none;
+  }
+  nav.top > * { pointer-events: auto; }
+
+  /* Index & Grid page headers get a solid background so they stay present
+     over the scrolling content. Sharp solid edge, no fade. */
+  nav.top.page-nav {
+    background: var(--bg);
+    padding-top: clamp(1.4rem, 3vh, 2rem);
+    padding-bottom: clamp(1.4rem, 3vh, 2rem);
+  }
+
+  .plus {
+    font-family: var(--font-sans);
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: none;
+    border: none;
+    cursor: none;
+    text-decoration: none;
+    line-height: 1;
+    transition: transform 0.3s ease, color 0.2s ease;
+  }
+  .plus:hover { color: var(--accent); }
+  .plus.chosen { color: var(--accent); }
+  .plus.breathing { animation: plusBreath 2.5s ease-in-out infinite; }
+  @keyframes plusBreath {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+  }
+
+  /* "+" hover tooltip popup */
+  #plus-tooltip {
+    position: fixed;
+    z-index: 300;
+    max-width: 320px;
+    background: rgba(255, 255, 250, 0.55);
+    backdrop-filter: blur(36px) saturate(140%);
+    -webkit-backdrop-filter: blur(36px) saturate(140%);
+    padding: 1rem 1.15rem;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #plus-tooltip.visible { opacity: 1; transform: translateY(0); }
+  #plus-tooltip .pt-title {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+    color: var(--ink);
+  }
+  #plus-tooltip .pt-body {
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: clamp(1rem, 2.5vw, 2.2rem);
+  }
+  .nav-link {
+    font-family: var(--font-sans);
+    font-size: clamp(0.95rem, 1.05vw, 1.05rem);
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 400;
+    cursor: none;
+    background: none;
+    border: none;
+    padding: 0;
+    transition: color 0.2s;
+  }
+  .nav-link.active { color: var(--accent); }
+  .nav-link:hover { color: var(--accent); }
+
+  /* ──────────────────────────────────────────────────────────────
+     CUSTOM CURSOR (above everything except video pause)
+     ────────────────────────────────────────────────────────────── */
+  .cursor {
+    position: fixed;
+    width: 14px; height: 14px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, background 0.2s;
+  }
+  .cursor.dragging {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     PAGES (single-page app)
+     ────────────────────────────────────────────────────────────── */
+  .page {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+  }
+  .page.active {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 0.6s ease, visibility 0s linear 0s;
+  }
+  /* Scrollable content pages */
+  #page-index.active,
+  #page-grid.active {
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* The homepage overlay sits ABOVE the map so the map can show through */
+  #page-flow-wrap {
+    z-index: 20;
+    background: transparent;
+    pointer-events: none; /* never block — only its nav children take clicks */
+  }
+  #page-flow-wrap nav.top > * { pointer-events: auto; }
+  /* Homepage text itself doesn't intercept clicks either — clicks pass through to map */
+  #page-flow { pointer-events: none; }
+
+  /* ──────────────────────────────────────────────────────────────
+     HOMEPAGE & MAP-INTRO SCROLL STAGES
+     The homepage and 3 map-intro pages share the same scroll
+     mechanism: each is a stage in a scroll-controlled timeline.
+     ────────────────────────────────────────────────────────────── */
+  #page-flow {
+    position: fixed;
+    inset: 0;
+    padding: clamp(5rem, 9vh, 7rem) clamp(1.5rem, 4vw, 4rem) clamp(2rem, 6vh, 4rem);
+    overflow: hidden;
+    pointer-events: auto;
+  }
+
+  .flow-stage {
+    position: absolute;
+    inset: clamp(5rem, 9vh, 7rem) clamp(1.5rem, 4vw, 4rem) clamp(2rem, 6vh, 4rem);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  .flow-stage.visible { opacity: 1; pointer-events: auto; }
+  /* Homepage text fade is now controlled per-element in JS (title/count/blurb) */
+  #home-text {
+    opacity: 1;
+  }
+
+  /* Homepage: count at top, title in upper-middle, blurb just below — equal gaps */
+  .stage-home {
+    display: grid;
+    grid-template-rows: auto auto auto 1fr;
+    row-gap: clamp(2rem, 5vh, 4rem);
+    justify-items: start;
+    align-items: start;
+    padding-top: clamp(4rem, 12vh, 10rem);
+  }
+  .stage-home .count-line { align-self: start; }
+  .stage-home .big-title  { align-self: start; }
+  .stage-home .blurb-stack {
+    align-self: start;
+    position: relative;
+    /* Doubled gap from the title */
+    margin-top: clamp(2rem, 5vh, 4rem);
+    max-width: 580px;
+    width: 100%;
+  }
+  .stage-home .blurb {
+    position: absolute;
+    top: 0; left: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  .stage-home .blurb.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* HOMEPAGE — big "Bags on trees" + count + paragraph */
+  .stage-home .count-line {
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.2vw, 1.5rem);
+    font-weight: 400;
+    margin-top: 1rem;
+    transition: opacity 0.5s ease;
+  }
+  .stage-home .big-title {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: clamp(3.5rem, 14vw, 16rem);
+    line-height: 0.85;
+    letter-spacing: -0.14em;
+    margin: 0;
+    align-self: flex-start;
+    white-space: nowrap;
+    max-width: 100%;
+    transition: opacity 0.5s ease;
+  }
+  .stage-home .blurb {
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.15vw, 1.4rem);
+    line-height: 1.4;
+    max-width: 580px;
+    margin-bottom: 0;
+  }
+  .stage-home .blurb.active { opacity: 1; }
+
+  /* MAP INTRO stages — single paragraph */
+  .stage-intro p {
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.15vw, 1.4rem);
+    line-height: 1.4;
+    max-width: 580px;
+    margin-top: 18vh;
+    margin-bottom: 0;
+  }
+
+  /* Scroll hint */
+  .scroll-hint {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--grey-3);
+    z-index: 60;
+    pointer-events: none;
+    animation: hintFade 4s ease forwards 1s;
+  }
+  @keyframes hintFade {
+    0%       { opacity: 0; }
+    20%, 70% { opacity: 0.7; }
+    100%     { opacity: 0; }
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     INDEX PAGE
+     ────────────────────────────────────────────────────────────── */
+  #page-index {
+    height: 100vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bg);
+  }
+  #page-index .container {
+    /* Padding top clears the nav; horizontal padding 0 so dividers reach the edges */
+    padding: clamp(5rem, 10vh, 7rem) 0 4rem;
+    min-height: 100%;
+  }
+  .index-row {
+    display: grid;
+    grid-template-columns: 1fr 1.8fr 1fr 0.8fr;
+    column-gap: 1.5rem;
+    align-items: baseline;
+    /* Inner horizontal padding on the row so text aligns, but the border spans full width */
+    padding: 1.1rem clamp(1.5rem, 4vw, 4rem);
+    border-bottom: 1px solid rgba(0,0,0,0.18);
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.2vw, 1.25rem);
+    cursor: none;
+    transition: opacity 0.2s;
+  }
+  /* No top divider — first row has no top border */
+  .index-row:hover { color: var(--accent); }
+  .index-row .col-time,
+  .index-row .col-date {
+    text-align: right;
+    font-family: var(--font-serif);
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     GRID PAGE
+     ────────────────────────────────────────────────────────────── */
+  #page-grid {
+    height: 100vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bg);
+  }
+  #page-grid .container {
+    padding: clamp(5rem, 10vh, 7rem) clamp(1.5rem, 4vw, 4rem) 4rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+  .grid-cell {
+    display: flex;
+    flex-direction: column;
+    cursor: none;
+    background: rgba(0,0,0,0.02);
+    padding: 1rem;
+  }
+  .grid-cell-meta {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 1rem;
+    align-items: baseline;
+    padding-bottom: 0.85rem;
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+  }
+  .grid-cell-meta .gcm-time,
+  .grid-cell-meta .gcm-date { color: var(--grey-2); }
+  .grid-cell-video-wrap {
+    background: var(--bg);
+    aspect-ratio: 3 / 4;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+  .grid-cell-video-wrap img,
+  .grid-cell-video-wrap video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* Image always present as the poster underneath */
+  .grid-cell-video-wrap img {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  /* Video sits on top, hidden until it's genuinely playing (no white flash) */
+  .grid-cell-video-wrap video {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .grid-cell-video-wrap video.ready { opacity: 1; }
+
+  /* CINEMATIC EXPAND — soft scale + opacity transition for grid→map */
+  #expand-overlay {
+    position: fixed;
+    z-index: 200;
+    background: #000;
+    overflow: hidden;
+    pointer-events: none;
+    transform-origin: center center;
+    opacity: 0;
+    will-change: transform, opacity;
+    transition: transform 0.62s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+    /* Soft blurred edges while growing — feathered mask around the frame */
+    -webkit-mask-image: radial-gradient(ellipse 130% 130% at center, #000 72%, transparent 100%);
+            mask-image: radial-gradient(ellipse 130% 130% at center, #000 72%, transparent 100%);
+  }
+  #expand-overlay.entering { opacity: 1; }
+  #expand-overlay video,
+  #expand-overlay img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* Once fully grown, drop the feathered mask so the final frame is crisp full-bleed */
+  #expand-overlay.settled {
+    -webkit-mask-image: none;
+            mask-image: none;
+  }
+  #expand-overlay.gone {
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     MAP CANVAS PAGE — the data view (formerly the whole app)
+     ────────────────────────────────────────────────────────────── */
+  #page-map { background: var(--bg); }
+  #map-stage {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 5;
+  }
+  #canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    transition: opacity 0.45s ease;
+  }
+  /* When video plays: map layer drops behind video, hidden */
+  #page-map.video-active #canvas { opacity: 0; }
+  #page-map.video-active { background: #000; }
+
+  /* Background hover-video */
+  #bg-video-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  #bg-video-wrap.active { opacity: 1; }
+  #bg-video-wrap.clickable { pointer-events: auto; cursor: none; }
+  #bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Hover info card — image 2 layout: horizontal title row + address line */
+  .bloom-card {
+    position: fixed;
+    z-index: 70;
+    background: rgba(255, 255, 250, 0.4);
+    backdrop-filter: blur(36px) saturate(140%);
+    -webkit-backdrop-filter: blur(36px) saturate(140%);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 1.2rem 1.4rem;
+    min-width: 280px;
+    max-width: 480px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .bloom-card.visible { opacity: 1; }
+  .card-tree {
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 0.35rem;
+  }
+  .card-latin {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink);
+    line-height: 1.2;
+    margin-bottom: 0.35rem;
+  }
+  .card-latin:empty { display: none; }
+  .card-address {
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--ink);
+    line-height: 1.35;
+  }
+  /* Date + time at the bottom (only present for blooms) */
+  .card-datetime {
+    display: flex;
+    gap: 1.19rem;
+    margin-top: 0.55rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+  .card-datetime:empty { display: none; }
+  .card-date, .card-time { white-space: nowrap; }
+  /* ──────────────────────────────────────────────────────────────
+     LOADING SCREEN — title top-left (matching homepage), breathing dot center
+     ────────────────────────────────────────────────────────────── */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: var(--bg);
+    transition: opacity 0.8s ease;
+  }
+  #loading-screen.gone {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #loading-screen .loading-title {
+    position: absolute;
+    /* Static start: horizontally centered. Vertical set by JS to match homepage title. */
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: clamp(3.5rem, 14vw, 16rem);
+    letter-spacing: -0.14em;
+    line-height: 0.85;
+    color: var(--ink);
+    white-space: nowrap;
+    max-width: calc(100% - 3rem);
+    /* No transition at start — added only when settling, so it's static on load */
+  }
+  #loading-screen.settling .loading-title {
+    transition: left 1s cubic-bezier(0.65, 0, 0.18, 1),
+                transform 1s cubic-bezier(0.65, 0, 0.18, 1);
+  }
+  /* Settle position is set at runtime by JS (measures the real homepage title) */
+  #loading-screen .loading-caption {
+    position: absolute;
+    bottom: calc(clamp(4rem, 14vh, 10rem) + 2.4rem);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: clamp(0.8rem, 1vw, 0.95rem);
+    letter-spacing: 0.04em;
+    color: var(--grey-3);
+    white-space: nowrap;
+    transition: opacity 0.4s ease;
+  }
+  #loading-screen.settling .loading-caption { opacity: 0; }
+  #loading-screen .loading-dot {
+    position: absolute;
+    bottom: clamp(4rem, 14vh, 10rem);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: loadingBreath 1.6s ease-in-out infinite;
+  }
+  #loading-screen.settling .loading-dot { opacity: 0; transition: opacity 0.4s ease; }
+  @keyframes loadingBreath {
+    0%, 100% { transform: translateX(-50%) scale(0.7); opacity: 0.5; }
+    50%      { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="loading-title">Bagsontrees</div>
+  <div class="loading-caption" id="loading-caption">Mapping every tree in New York City</div>
+  <div class="loading-dot"></div>
+</div>
+
+<!-- CUSTOM CURSOR -->
+<div class="cursor" id="cursor"></div>
+
+<!-- "+" HOVER TOOLTIP -->
+<div id="plus-tooltip">
+  <div class="pt-title">Add to the Collection</div>
+  <div class="pt-body">You are heading to Are.na. To contribute, upload your video of a bag on a tree anywhere in NYC. Please include the date, time, and address. Thank you for helping document the wild things happening in our canopy.</div>
+</div>
+
+<!-- GLOBAL TOP NAV (visible on Map; hidden during initial flow and on Index/Grid which have their own) -->
+<nav class="top" id="topnav" style="display:none;">
+  <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" id="plus-btn" title="Upload to the archive">+</a>
+  <div class="nav-links">
+    <button class="nav-link" data-nav="grid">Grid</button>
+    <button class="nav-link" data-nav="map">Map</button>
+    <button class="nav-link" data-nav="index">Index</button>
+  </div>
+</nav>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: HOMEPAGE OVERLAY (sits on top of the map underneath)
+     The map renders behind the homepage text. Scrolling progressively
+     reveals the map by zooming in + fading the homepage text out.
+     ─────────────────────────────────────────────────────────── -->
+<div class="page active" id="page-flow-wrap">
+  <nav class="top" id="flow-nav">
+    <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" id="flow-plus" title="Upload to the archive">+</a>
+    <div class="nav-links" id="flow-nav-links">
+      <button class="nav-link" data-nav="grid">Grid</button>
+      <button class="nav-link" data-nav="map" id="nav-map">Map</button>
+      <button class="nav-link" data-nav="index">Index</button>
+    </div>
+  </nav>
+
+  <div id="page-flow">
+    <section class="flow-stage stage-home visible" data-stage="0" id="home-text">
+      <div class="count-line" id="count-line">In this site current documentation of <span id="home-count">0</span> bags on trees</div>
+      <h1 class="big-title">Bagsontrees</h1>
+      <div class="blurb-stack">
+        <p class="blurb blurb-0 active">Winter Phenomenon is an ongoing archive of plastic bags, rubbish, and random leftovers caught in the naked trees of NYC, primarily during the winter, documenting a visual choreography of wind-curated waste.</p>
+        <p class="blurb blurb-1">Every single dot on this screen represents a tree planted across New York City, all five boroughs, a living network mapped from open data.</p>
+        <p class="blurb blurb-2">The Dark dots on this map indicate trees carrying bags, capturing an unsolved metropolitan phenomenon. This is a living archive. You are invited to contribute to this growing documentation by uploading your own video sightings of bags in the branches.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="scroll-hint">scroll</div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: MAP (the interactive data view)
+     ─────────────────────────────────────────────────────────── -->
+<div class="page active" id="page-map">
+  <div id="map-stage">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="bg-video-wrap">
+    <video id="bg-video" muted loop playsinline preload="none"></video>
+  </div>
+  <div class="bloom-card" id="bloom-card">
+    <div class="card-tree" id="card-tree">Tree Name</div>
+    <div class="card-latin" id="card-latin">latin name</div>
+    <div class="card-address" id="card-address">Address</div>
+    <div class="card-datetime" id="card-datetime">
+      <span class="card-date" id="card-date">Date</span>
+      <span class="card-time" id="card-time">Time</span>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: INDEX
+     ─────────────────────────────────────────────────────────── -->
+<div class="page" id="page-index">
+  <nav class="top page-nav">
+    <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" title="Upload to the archive">+</a>
+    <div class="nav-links">
+      <button class="nav-link" data-nav="grid">Grid</button>
+      <button class="nav-link" data-nav="map">Map</button>
+      <button class="nav-link active" data-nav="index">Index</button>
+    </div>
+  </nav>
+  <div class="container">
+    <div id="index-rows"></div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: GRID
+     ─────────────────────────────────────────────────────────── -->
+<div class="page" id="page-grid">
+  <nav class="top page-nav">
+    <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" title="Upload to the archive">+</a>
+    <div class="nav-links">
+      <button class="nav-link active" data-nav="grid">Grid</button>
+      <button class="nav-link" data-nav="map">Map</button>
+      <button class="nav-link" data-nav="index">Index</button>
+    </div>
+  </nav>
+  <div class="container">
+    <div class="grid" id="grid-cells"></div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   STATE — single source of truth shared across pages
+   ════════════════════════════════════════════════════════════ */
+const ARENA_SLUG = 'bags-on-trees';
+const state = {
+  entries: [],          // arena blocks (parsed)
+  allTrees: [],         // NYC trees
+  bloomSpecies: new Set(),
+  introReady: false,
+  blooms: [],           // Bloom instances for the map page
+  page: 'flow',         // current page id
+  flowStage: 0,         // 0..2 = home / intro1 / intro2  (map is its own page)
+};
+
+/* ════════════════════════════════════════════════════════════
+   ARE.NA FETCH
+   ════════════════════════════════════════════════════════════ */
+const MONTHS = {
+  january:0, february:1, march:2, april:3, may:4, june:5,
+  july:6, august:7, september:8, october:9, november:10, december:11
+};
+
+function parseDescription(desc) {
+  if (!desc) return null;
+  desc = desc.replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ');
+  const re = /(?:(\d{1,2})\s+)?(\w+)\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2})\s*[\n\r]+\s*([^(]+?)\s*[,]?\s*\(([+-]?\d+\.\d+)[,\s]+([+-]?\d+\.\d+)\)/i;
+  const m = desc.match(re);
+  if (!m) return null;
+  const day = m[1] ? parseInt(m[1]) : 1;
+  const month = MONTHS[m[2].toLowerCase()];
+  const year = parseInt(m[3]);
+  const hour = parseInt(m[4]);
+  const minute = parseInt(m[5]);
+  const address = m[6].trim().replace(/,\s*$/, '');
+  const lat = parseFloat(m[7]);
+  const lon = parseFloat(m[8]);
+  if (month === undefined || isNaN(lat) || isNaN(lon)) return null;
+  return { date: new Date(year, month, day, hour, minute), hour: hour + minute/60, address, lat, lon };
+}
+
+async function fetchArena() {
+  const url = `https://api.are.na/v2/channels/${ARENA_SLUG}/contents?per=100`;
+  try {
+    const res = await fetch(url, { priority: 'high' });
+    if (!res.ok) throw new Error(`Arena HTTP ${res.status}`);
+    const data = await res.json();
+    const entries = [];
+    for (const block of data.contents) {
+      const parsed = parseDescription(block.description);
+      if (!parsed) {
+        console.warn('[arena] Could not parse:', block.title, block.description);
+        continue;
+      }
+      entries.push({
+        id: block.id,
+        title: block.title || block.generated_title || 'untitled',
+        lat: parsed.lat,
+        lon: parsed.lon,
+        hour: parsed.hour,
+        date: parsed.date,
+        address: parsed.address,
+        videoUrl: block.attachment?.url || null,
+        imageUrl: block.image?.large?.url || block.image?.display?.url || null,
+      });
+    }
+    console.log(`[arena] Loaded ${entries.length}/${data.contents.length} blocks`);
+    return entries;
+  } catch (e) {
+    console.error('[arena] Fetch failed:', e.message);
+    return [];
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   NYC TREES
+   Fast path: load pre-baked binary `trees.bin` (positions already
+   relaxed + species). Fallback: live NYC Open Data API.
+   ════════════════════════════════════════════════════════════ */
+const METERS_PER_DEG_LAT = 111000;
+const PAGE_SIZE = 50000;
+const TREE_FIELDS = 'latitude,longitude,spc_common,spc_latin,address,zipcode,zip_city,tree_dbh,status';
+const TREES_BIN_URL = 'trees.bin';
+const TREES_SPECIES_URL = 'trees-species.json';
+
+/* Binary format (little-endian):
+   [0]      Uint32  magic 0x42414754 ("TGAB")
+   [4]      Uint32  version (1)
+   [8]      Uint32  count N
+   [12..]   per tree (18 bytes):
+              Float32 wx        (relaxed world x)
+              Float32 wy        (relaxed world y)
+              Float32 lat
+              Float32 lon
+              Uint16  speciesIndex
+   species names come from trees-species.json (array, index = speciesIndex)
+*/
+const BIN_MAGIC = 0x42414754;
+const BIN_BYTES_PER_TREE = 18;
+
+let speciesDict = [];  // index → species common name (latin packed too)
+
+async function tryLoadBinaryTrees() {
+  try {
+    const [binRes, spcRes] = await Promise.all([
+      fetch(TREES_BIN_URL, { priority: 'high' }),
+      fetch(TREES_SPECIES_URL, { priority: 'high' }),
+    ]);
+    if (!binRes.ok || !spcRes.ok) return false;
+    speciesDict = await spcRes.json(); // [{c:"honey locust", l:"Gleditsia triacanthos"}, ...]
+    const buf = await binRes.arrayBuffer();
+    const dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== BIN_MAGIC) {
+      console.warn('[trees] bad magic in trees.bin');
+      return false;
+    }
+    const count = dv.getUint32(8, true);
+    let off = 12;
+    for (let i = 0; i < count; i++) {
+      const wx = dv.getFloat32(off, true); off += 4;
+      const wy = dv.getFloat32(off, true); off += 4;
+      const lat = dv.getFloat32(off, true); off += 4;
+      const lon = dv.getFloat32(off, true); off += 4;
+      const spc = dv.getUint16(off, true); off += 2;
+      const dict = speciesDict[spc] || { c: 'unknown', l: '' };
+      const rankHash = Math.abs(Math.sin(lat * 9301 + lon * 49297) * 233280) % 1;
+      state.allTrees.push({
+        lat, lon, wx, wy,
+        dbh: 4,
+        species: dict.c || 'unknown',
+        latin: dict.l || '',
+        address: '', zipcode: '', zip_city: '',
+        rank: rankHash,
+      });
+    }
+    console.log(`[trees] Loaded ${count} from binary (fast path)`);
+    return true;
+  } catch (e) {
+    console.warn('[trees] Binary load failed, will use API:', e.message);
+    return false;
+  }
+}
+
+async function fetchTreePage(offset) {
+  const url = `https://data.cityofnewyork.us/resource/uvpi-gqnh.json` +
+              `?$select=${TREE_FIELDS}` +
+              `&$where=status='Alive' AND latitude IS NOT NULL` +
+              `&$limit=${PAGE_SIZE}` +
+              `&$offset=${offset}`;
+  const res = await fetch(url, { priority: 'high' });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[trees] HTTP ${res.status}:`, body.slice(0,300));
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data
+    .filter(t => t.latitude && t.longitude)
+    .map(t => {
+      const lat = parseFloat(t.latitude);
+      const lon = parseFloat(t.longitude);
+      const p = project(lat, lon);
+      const rankHash = Math.abs(Math.sin(lat * 9301 + lon * 49297) * 233280) % 1;
+      return {
+        lat, lon, wx: p.x, wy: p.y,
+        dbh: parseInt(t.tree_dbh) || 4,
+        species: t.spc_common || 'unknown',
+        latin: t.spc_latin || '',
+        address: t.address || '',
+        zipcode: t.zipcode || '',
+        zip_city: t.zip_city || '',
+        rank: rankHash,
+      };
+    });
+}
+
+async function loadInitialTrees(maxPages = 4) {
+  let offset = 0;
+  let page = 0;
+  while (page < maxPages) {
+    page++;
+    let batch;
+    try { batch = await fetchTreePage(offset); }
+    catch (e) { console.warn(`[trees] page ${page} failed:`, e.message); break; }
+    if (batch.length === 0) break;
+    for (const t of batch) state.allTrees.push(t);
+    console.log(`[trees] initial page ${page}: +${batch.length} (total ${state.allTrees.length})`);
+    if (batch.length < PAGE_SIZE) return offset + PAGE_SIZE;
+    offset += PAGE_SIZE;
+    await new Promise(r => setTimeout(r, 30));
+  }
+  buildTreeIndex();
+  return offset;
+}
+
+async function loadRemainingTrees(startOffset) {
+  let offset = startOffset;
+  let page = Math.floor(offset / PAGE_SIZE);
+  while (true) {
+    page++;
+    let batch;
+    try { batch = await fetchTreePage(offset); }
+    catch (e) { console.warn(`[trees] bg page ${page} failed:`, e.message); break; }
+    if (batch.length === 0) break;
+    insertTreesWithLocalRelax(batch);
+    console.log(`[trees] bg page ${page}: +${batch.length} (total ${state.allTrees.length})`);
+    if (batch.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+/* ────────────────────────────────────────────────────────────
+   EXPORTER — run once to generate trees.bin + trees-species.json
+   Trigger by pressing Shift+E on the map, or call exportTreesBin()
+   in the console. Requires the full dataset + relaxation to have
+   completed first.
+   ──────────────────────────────────────────────────────────── */
+async function exportTreesBin() {
+  if (state.allTrees.length < 100000) {
+    alert(`Only ${state.allTrees.length} trees loaded. Wait for the full city to finish loading first (check console for "Full city load complete").`);
+    return;
+  }
+  // Build species dictionary
+  const dictMap = new Map(); // "common|latin" → index
+  const dictArr = [];
+  function speciesIndex(common, latin) {
+    const key = `${common}|${latin}`;
+    if (dictMap.has(key)) return dictMap.get(key);
+    const idx = dictArr.length;
+    dictMap.set(key, idx);
+    dictArr.push({ c: common, l: latin });
+    return idx;
+  }
+
+  const N = state.allTrees.length;
+  const buf = new ArrayBuffer(12 + N * BIN_BYTES_PER_TREE);
+  const dv = new DataView(buf);
+  dv.setUint32(0, BIN_MAGIC, true);
+  dv.setUint32(4, 1, true);
+  dv.setUint32(8, N, true);
+  let off = 12;
+  for (const t of state.allTrees) {
+    const spc = speciesIndex(t.species || 'unknown', t.latin || '');
+    dv.setFloat32(off, t.wx, true); off += 4;
+    dv.setFloat32(off, t.wy, true); off += 4;
+    dv.setFloat32(off, t.lat, true); off += 4;
+    dv.setFloat32(off, t.lon, true); off += 4;
+    dv.setUint16(off, spc, true); off += 2;
+  }
+
+  // Download trees.bin
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'trees.bin';
+  a.click();
+
+  // Download trees-species.json
+  const spcBlob = new Blob([JSON.stringify(dictArr)], { type: 'application/json' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(spcBlob);
+  a2.download = 'trees-species.json';
+  setTimeout(() => a2.click(), 400);
+
+  console.log(`[export] Wrote ${N} trees, ${dictArr.length} species. File size ~${(buf.byteLength/1e6).toFixed(1)} MB`);
+}
+window.exportTreesBin = exportTreesBin;
+window.addEventListener('keydown', (e) => {
+  if (e.shiftKey && (e.key === 'E' || e.key === 'e')) exportTreesBin();
+});
+
+/* ════════════════════════════════════════════════════════════
+   PROJECTION & GRID
+   ════════════════════════════════════════════════════════════ */
+const NYC_CENTER = { lat: 40.72, lon: -73.97 };
+const SCALE_FACTOR = 12000;
+function project(lat, lon) {
+  return { x: (lon - NYC_CENTER.lon) * SCALE_FACTOR, y: (NYC_CENTER.lat - lat) * SCALE_FACTOR };
+}
+
+const GRID_DEG = 0.002;
+const treeGrid = new Map();
+function gridKey(lat, lon) { return `${Math.floor(lat/GRID_DEG)},${Math.floor(lon/GRID_DEG)}`; }
+function buildTreeIndex() {
+  treeGrid.clear();
+  for (const t of state.allTrees) {
+    const k = gridKey(t.lat, t.lon);
+    if (!treeGrid.has(k)) treeGrid.set(k, []);
+    treeGrid.get(k).push(t);
+  }
+}
+function findNearestTree(lat, lon, maxDistMeters = 8) {
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  const baseLat = Math.floor(lat / GRID_DEG);
+  const baseLon = Math.floor(lon / GRID_DEG);
+  let best = null, bestDist = Infinity;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const cell = treeGrid.get(`${baseLat + dy},${baseLon + dx}`);
+      if (!cell) continue;
+      for (const t of cell) {
+        const dLat = (t.lat - lat) * METERS_PER_DEG_LAT;
+        const dLon = (t.lon - lon) * METERS_PER_DEG_LAT * cosLat;
+        const d = Math.sqrt(dLat*dLat + dLon*dLon);
+        if (d < bestDist) { bestDist = d; best = t; }
+      }
+    }
+  }
+  return bestDist < maxDistMeters ? best : null;
+}
+
+// Always returns the nearest tree, expanding the search radius until one is found.
+// Used to borrow species data even when blooms are far from any census tree.
+function findNearestTreeAnyDistance(lat, lon) {
+  if (!treeGrid.size) return null;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  const baseLat = Math.floor(lat / GRID_DEG);
+  const baseLon = Math.floor(lon / GRID_DEG);
+  let best = null, bestDist = Infinity;
+  // Expand outward in rings until we find at least one tree (then take the closest from that ring + the one before)
+  for (let r = 1; r <= 50; r++) {
+    let foundAny = false;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        // Only check the perimeter of this ring
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const cell = treeGrid.get(`${baseLat + dy},${baseLon + dx}`);
+        if (!cell) continue;
+        foundAny = true;
+        for (const t of cell) {
+          const dLat = (t.lat - lat) * METERS_PER_DEG_LAT;
+          const dLon = (t.lon - lon) * METERS_PER_DEG_LAT * cosLat;
+          const d = Math.sqrt(dLat*dLat + dLon*dLon);
+          if (d < bestDist) { bestDist = d; best = t; }
+        }
+      }
+    }
+    // Once we've found at least one tree in the current ring and one ring before, we're confident
+    if (best && r >= 2) break;
+  }
+  return best;
+}
+
+const WORLD_CELL = 100;
+const worldGrid = new Map();
+const treeBounds = { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity, valid: false };
+function computeTreeBounds() {
+  if (!state.allTrees.length) { treeBounds.valid = false; return; }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const t of state.allTrees) {
+    if (t.wx < minX) minX = t.wx;
+    if (t.wx > maxX) maxX = t.wx;
+    if (t.wy < minY) minY = t.wy;
+    if (t.wy > maxY) maxY = t.wy;
+  }
+  treeBounds.minX = minX; treeBounds.maxX = maxX;
+  treeBounds.minY = minY; treeBounds.maxY = maxY;
+  treeBounds.valid = true;
+}
+
+function rebuildGridByWorldPos() {
+  worldGrid.clear();
+  for (const t of state.allTrees) {
+    const cx = Math.floor(t.wx / WORLD_CELL);
+    const cy = Math.floor(t.wy / WORLD_CELL);
+    const k = `${cx},${cy}`;
+    if (!worldGrid.has(k)) worldGrid.set(k, []);
+    worldGrid.get(k).push(t);
+  }
+  computeTreeBounds();
+}
+
+// Clamp a target view position so the user can't pan far past the trees.
+// Allows panning anywhere within the tree bounding box + a small margin.
+function clampViewTarget() {
+  if (!treeBounds.valid) return;
+  const margin = 200; // world units of slack beyond the outermost trees
+  const minX = treeBounds.minX - margin;
+  const maxX = treeBounds.maxX + margin;
+  const minY = treeBounds.minY - margin;
+  const maxY = treeBounds.maxY + margin;
+  view.targetX = Math.max(minX, Math.min(maxX, view.targetX));
+  view.targetY = Math.max(minY, Math.min(maxY, view.targetY));
+}
+
+// If the current view is far from any tree, recenter on the trees' center.
+function resetPositionIfEmpty() {
+  if (!treeBounds.valid) return;
+  const checkRadiusWorld = 600;
+  const cx = Math.floor(view.targetX / WORLD_CELL);
+  const cy = Math.floor(view.targetY / WORLD_CELL);
+  const cellRad = Math.ceil(checkRadiusWorld / WORLD_CELL);
+  let found = false;
+  for (let dy = -cellRad; dy <= cellRad && !found; dy++) {
+    for (let dx = -cellRad; dx <= cellRad && !found; dx++) {
+      if (worldGrid.has(`${cx + dx},${cy + dy}`)) found = true;
+    }
+  }
+  if (!found) {
+    view.x = view.targetX = (treeBounds.minX + treeBounds.maxX) / 2;
+    view.y = view.targetY = (treeBounds.minY + treeBounds.maxY) / 2;
+  }
+}
+
+function findTreeAtScreenPos(mx, my, maxPixels = 14) {
+  if (!worldGrid.size) return null;
+  const wx = (mx - W/2) / view.scale + view.x;
+  const wy = (my - H/2) / view.scale + view.y;
+  const searchRad = Math.ceil(maxPixels / view.scale / WORLD_CELL) + 1;
+  const cx = Math.floor(wx / WORLD_CELL);
+  const cy = Math.floor(wy / WORLD_CELL);
+  const lodMax = lodThreshold(view.scale);
+  const maxPx2 = maxPixels * maxPixels;
+  let best = null, bestDistPx = Infinity;
+  for (let dy = -searchRad; dy <= searchRad; dy++) {
+    for (let dx = -searchRad; dx <= searchRad; dx++) {
+      const cell = worldGrid.get(`${cx + dx},${cy + dy}`);
+      if (!cell) continue;
+      for (const tree of cell) {
+        if (tree.rank > lodMax) continue;
+        const tx = (tree.wx - view.x) * view.scale + W/2;
+        const ty = (tree.wy - view.y) * view.scale + H/2;
+        const ddx = tx - mx, ddy = ty - my;
+        const d2 = ddx*ddx + ddy*ddy;
+        if (d2 < maxPx2 && d2 < bestDistPx) { bestDistPx = d2; best = tree; }
+      }
+    }
+  }
+  return best;
+}
+
+/* ════════════════════════════════════════════════════════════
+   FORCE RELAXATION + INCREMENTAL INSERT
+   ════════════════════════════════════════════════════════════ */
+const MIN_GAP_WORLD = 14;
+const RELAX_ITERATIONS = 4;
+const RELAX_CELL = MIN_GAP_WORLD * 2;
+
+async function relaxTreePositions() {
+  if (state.allTrees.length === 0) return;
+  for (let iter = 0; iter < RELAX_ITERATIONS; iter++) {
+    const cells = new Map();
+    for (let i = 0; i < state.allTrees.length; i++) {
+      const t = state.allTrees[i];
+      const cx = Math.floor(t.wx / RELAX_CELL);
+      const cy = Math.floor(t.wy / RELAX_CELL);
+      const k = `${cx},${cy}`;
+      if (!cells.has(k)) cells.set(k, []);
+      cells.get(k).push(i);
+    }
+    let moved = 0;
+    for (let i = 0; i < state.allTrees.length; i++) {
+      const a = state.allTrees[i];
+      const cx = Math.floor(a.wx / RELAX_CELL);
+      const cy = Math.floor(a.wy / RELAX_CELL);
+      let dxSum = 0, dySum = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const cell = cells.get(`${cx + ox},${cy + oy}`);
+          if (!cell) continue;
+          for (const j of cell) {
+            if (j === i) continue;
+            const b = state.allTrees[j];
+            const dx = a.wx - b.wx;
+            const dy = a.wy - b.wy;
+            const d2 = dx*dx + dy*dy;
+            if (d2 < MIN_GAP_WORLD*MIN_GAP_WORLD && d2 > 0.0001) {
+              const d = Math.sqrt(d2);
+              const push = (MIN_GAP_WORLD - d) * 0.5;
+              dxSum += (dx/d) * push;
+              dySum += (dy/d) * push;
+            }
+          }
+        }
+      }
+      if (dxSum !== 0 || dySum !== 0) {
+        a.wx += dxSum; a.wy += dySum;
+        moved++;
+      }
+    }
+    await new Promise(r => setTimeout(r, 0));
+    if (moved < state.allTrees.length * 0.01) break;
+  }
+}
+
+function insertTreesWithLocalRelax(batch) {
+  const LOCAL_GAP = MIN_GAP_WORLD;
+  const LOCAL_GAP2 = LOCAL_GAP*LOCAL_GAP;
+  for (const t of batch) {
+    state.allTrees.push(t);
+    const llk = gridKey(t.lat, t.lon);
+    if (!treeGrid.has(llk)) treeGrid.set(llk, []);
+    treeGrid.get(llk).push(t);
+    const cx = Math.floor(t.wx / WORLD_CELL);
+    const cy = Math.floor(t.wy / WORLD_CELL);
+    const k = `${cx},${cy}`;
+    if (!worldGrid.has(k)) worldGrid.set(k, []);
+    worldGrid.get(k).push(t);
+  }
+  for (let iter = 0; iter < 3; iter++) {
+    for (const a of batch) {
+      const acx = Math.floor(a.wx / WORLD_CELL);
+      const acy = Math.floor(a.wy / WORLD_CELL);
+      let dxSum = 0, dySum = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const cell = worldGrid.get(`${acx+ox},${acy+oy}`);
+          if (!cell) continue;
+          for (const b of cell) {
+            if (b === a) continue;
+            const dx = a.wx - b.wx, dy = a.wy - b.wy;
+            const d2 = dx*dx + dy*dy;
+            if (d2 < LOCAL_GAP2 && d2 > 0.0001) {
+              const d = Math.sqrt(d2);
+              const push = (LOCAL_GAP - d) * 0.5;
+              dxSum += (dx/d)*push; dySum += (dy/d)*push;
+            }
+          }
+        }
+      }
+      if (dxSum !== 0 || dySum !== 0) {
+        const oldKey = `${Math.floor(a.wx/WORLD_CELL)},${Math.floor(a.wy/WORLD_CELL)}`;
+        a.wx += dxSum; a.wy += dySum;
+        const newKey = `${Math.floor(a.wx/WORLD_CELL)},${Math.floor(a.wy/WORLD_CELL)}`;
+        if (newKey !== oldKey) {
+          const oldCell = worldGrid.get(oldKey);
+          if (oldCell) {
+            const idx = oldCell.indexOf(a);
+            if (idx >= 0) oldCell.splice(idx, 1);
+          }
+          if (!worldGrid.has(newKey)) worldGrid.set(newKey, []);
+          worldGrid.get(newKey).push(a);
+        }
+      }
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   COLORS — palette only
+   ════════════════════════════════════════════════════════════ */
+const PALETTE_COLORS = ['#D1A98C', '#DCC3B3', '#A99586'];
+const speciesColorMap = new Map();
+function hashStringIndex(str, modulo) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h) + str.charCodeAt(i);
+  return Math.abs(h) % modulo;
+}
+function colorForSpecies(species) {
+  if (!species || species === 'unknown') species = 'unknown';
+  if (speciesColorMap.has(species)) return speciesColorMap.get(species);
+  const c = PALETTE_COLORS[hashStringIndex(species, PALETTE_COLORS.length)];
+  speciesColorMap.set(species, c);
+  return c;
+}
+
+/* ════════════════════════════════════════════════════════════
+   MAP CANVAS — Bloom class, view, render loop
+   ════════════════════════════════════════════════════════════ */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(DPR, DPR);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const view = {
+  x: 0, y: 0,
+  scale: 0.7,
+  targetX: 0, targetY: 0,
+  targetScale: 0.7,
+  mouseX: W/2, mouseY: H/2,
+  isDragging: false,
+  dragStart: null,
+};
+
+function hash(n) {
+  n = (n << 13) ^ n;
+  return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 0x7fffffff;
+}
+
+let currentHoverBloom = null;
+let currentVideoBloom = null;
+// Tracks where a fullscreen video was launched from, so clicking it returns there.
+let videoOrigin = null; // { page: 'grid'|'index', scrollTop: number }
+// Scroll-driven dot opacity: 0.5 until the third intro sentence, ramping to 1.0.
+let dotOpacityScroll = 0.5;
+
+class Bloom {
+  constructor(entry, i) {
+    this.entry = entry;
+    this.lat = entry.lat;
+    this.lon = entry.lon;
+    this.title = entry.title;
+    this.hour = entry.hour;
+    this.date = entry.date;
+    this.address = entry.address;
+    this.videoUrl = entry.videoUrl;
+    this.imageUrl = entry.imageUrl;
+    this.idx = i;
+    this.seed = i * 12.9898;
+    const p = project(this.lat, this.lon);
+    this.wx = p.x;
+    this.wy = p.y;
+    this.matchedTree = null;
+  }
+  screenPos() {
+    return { x: (this.wx - view.x) * view.scale + W/2, y: (this.wy - view.y) * view.scale + H/2 };
+  }
+  draw(t, scale) {
+    let { x, y } = this.screenPos();
+    if (x < -300 || x > W + 300 || y < -300 || y > H + 300) return;
+    const time = t * 0.0009;
+    const swayX = Math.sin(time + this.seed * 0.3) * 2.4 + Math.sin(time * 2.1 + this.seed) * 0.8;
+    const swayY = Math.cos(time * 0.85 + this.seed * 0.5) * 2.0 + Math.cos(time * 1.7 + this.seed * 2) * 0.6;
+    x += swayX; y += swayY;
+    this._lastDrawX = x; this._lastDrawY = y;
+    const baseR = 2.85;
+    const targetGrow = (currentHoverBloom === this) ? 2 : 0;
+    this._growth = (this._growth ?? 0) + (targetGrow - (this._growth ?? 0)) * 0.18;
+    const dotR = baseR + this._growth;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(x, y, dotR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  hitTest(mx, my) {
+    const x = this._lastDrawX ?? this.screenPos().x;
+    const y = this._lastDrawY ?? this.screenPos().y;
+    const dx = mx - x, dy = my - y;
+    return Math.sqrt(dx*dx + dy*dy) < 22;
+  }
+}
+
+function spreadOverlappingBlooms(blooms, minGapWorld = 20) {
+  const buckets = new Map();
+  for (const b of blooms) {
+    const key = `${Math.round(b.wx/minGapWorld)},${Math.round(b.wy/minGapWorld)}`;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(b);
+  }
+  for (const group of buckets.values()) {
+    if (group.length < 2) continue;
+    const cx = group.reduce((s,b)=>s+b.wx,0)/group.length;
+    const cy = group.reduce((s,b)=>s+b.wy,0)/group.length;
+    const radius = minGapWorld * (group.length > 4 ? 1.4 : 1.0);
+    group.forEach((b, i) => {
+      const ang = (i/group.length) * Math.PI * 2;
+      b.wx = cx + Math.cos(ang) * radius;
+      b.wy = cy + Math.sin(ang) * radius;
+      b.fanned = true;
+    });
+  }
+}
+
+function lodThreshold(scale) {
+  const s = Math.max(0.4, Math.min(12, scale));
+  const t = (s - 0.4) / (12 - 0.4);
+  return Math.min(1, 0.02 + Math.pow(t, 0.55) * 1.1);
+}
+
+const INTRO_DURATION = 3500;
+let introStart = null;
+function introProgress(t) {
+  if (!state.introReady) return 0;
+  if (introStart === null) introStart = t;
+  return Math.min(1, (t - introStart) / INTRO_DURATION);
+}
+
+function loop(t = 0) {
+  // Edge-panning: when cursor nears a screen edge on the map page (and not dragging),
+  // continuously pan the view in that direction.
+  if (state.page === 'map' && !view.isDragging) {
+    const margin = 90;            // px from edge where panning begins
+    const maxSpeed = 14;          // px/frame at the very edge (world px scaled)
+    let panX = 0, panY = 0;
+    const mx = view.mouseX, my = view.mouseY;
+
+    // Top nav zone: when the cursor is up here, the user is aiming for the menu
+    // (the "+" top-left or the links top-right). Suppress ALL edge-panning so the
+    // map doesn't drift while they reach for a button.
+    const navZoneHeight = 96;
+    const inNavZone = my < navZoneHeight;
+
+    if (!inNavZone) {
+      if (mx < margin)         panX = -(1 - mx / margin);
+      else if (mx > W - margin) panX = (1 - (W - mx) / margin);
+      if (my < margin)         panY = -(1 - my / margin);
+      else if (my > H - margin) panY = (1 - (H - my) / margin);
+    }
+
+    if (panX !== 0 || panY !== 0) {
+      view.targetX += (panX * maxSpeed) / view.scale;
+      view.targetY += (panY * maxSpeed) / view.scale;
+    }
+  }
+
+  // Keep the view within the trees' bounding box (+ margin) — stop panning into the void
+  if (state.page === 'map') clampViewTarget();
+
+  // Slower lerp = smoother, more cinematic transitions
+  view.x += (view.targetX - view.x) * 0.05;
+  view.y += (view.targetY - view.y) * 0.05;
+  view.scale += (view.targetScale - view.scale) * 0.05;
+
+  const intro = introProgress(t);
+  const eased = 1 - Math.pow(1 - intro, 3);
+  const blurAmt = (1 - eased) * 12;
+  canvas.style.filter = blurAmt > 0.5 ? `blur(${blurAmt.toFixed(2)}px)` : 'none';
+  const lodMultiplier = 0.15 + eased * 0.85;
+
+  ctx.clearRect(0, 0, W, H);
+  const px = (view.mouseX / W - 0.5) * 20;
+  const py = (view.mouseY / H - 0.5) * 20;
+  ctx.save();
+  ctx.translate(-px, -py);
+
+  // Trees
+  const treeOpacity = Math.max(0, Math.min(1, (view.scale - 0.4) / 0.4)) * dotOpacityScroll;
+  if (state.allTrees.length > 0 && treeOpacity > 0.02 && worldGrid.size > 0) {
+    const lodMax = lodThreshold(view.scale) * lodMultiplier;
+    const worldLeft = view.x - (W/2)/view.scale;
+    const worldRight = view.x + (W/2)/view.scale;
+    const worldTop = view.y - (H/2)/view.scale;
+    const worldBot = view.y + (H/2)/view.scale;
+    const cellLeft = Math.floor(worldLeft/WORLD_CELL) - 1;
+    const cellRight = Math.floor(worldRight/WORLD_CELL) + 1;
+    const cellTop = Math.floor(worldTop/WORLD_CELL) - 1;
+    const cellBot = Math.floor(worldBot/WORLD_CELL) + 1;
+    const byColor = {};
+    for (let cy = cellTop; cy <= cellBot; cy++) {
+      for (let cx = cellLeft; cx <= cellRight; cx++) {
+        const cell = worldGrid.get(`${cx},${cy}`);
+        if (!cell) continue;
+        for (const tree of cell) {
+          if (tree.rank > lodMax) continue;
+          const color = colorForSpecies(tree.species);
+          if (!byColor[color]) byColor[color] = [];
+          byColor[color].push(tree);
+        }
+      }
+    }
+    const dotR = 2.85;
+    ctx.globalAlpha = treeOpacity;
+    for (const color in byColor) {
+      ctx.fillStyle = color;
+      for (const tree of byColor[color]) {
+        const tx = (tree.wx - view.x) * view.scale + W/2;
+        const ty = (tree.wy - view.y) * view.scale + H/2;
+        if (tx < -10 || tx > W+10 || ty < -10 || ty > H+10) continue;
+        ctx.beginPath();
+        ctx.arc(tx, ty, dotR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Blooms
+  ctx.globalAlpha = dotOpacityScroll;
+  for (const b of state.blooms) b.draw(t, view.scale);
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+
+/* ════════════════════════════════════════════════════════════
+   MAP INTERACTION
+   ════════════════════════════════════════════════════════════ */
+const mapStage = document.getElementById('map-stage');
+const bgWrap = document.getElementById('bg-video-wrap');
+const bgVideo = document.getElementById('bg-video');
+const pageMap = document.getElementById('page-map');
+
+// Clicking the fullscreen video returns to where it was launched from (grid/index),
+// restoring the exact scroll position.
+bgWrap.addEventListener('click', () => {
+  if (!videoOrigin) return;
+  const origin = videoOrigin;
+  videoOrigin = null;
+  hideVideo();
+  currentHoverBloom = null;
+  goTo(origin.page);
+  const pageEl = document.getElementById('page-' + origin.page);
+  if (pageEl) {
+    // Restore scroll after the page becomes visible
+    requestAnimationFrame(() => { pageEl.scrollTop = origin.scrollTop; });
+  }
+});
+const card = document.getElementById('bloom-card');
+const cardTree = document.getElementById('card-tree');
+const cardDate = document.getElementById('card-date');
+const cardTime = document.getElementById('card-time');
+const cardAddress = document.getElementById('card-address');
+const cardLatin = document.getElementById('card-latin');
+const cardDatetime = document.getElementById('card-datetime');
+const cursor = document.getElementById('cursor');
+
+let videoTimer = null;
+function showVideoFor(bloom, startTime) {
+  if (bloom === currentVideoBloom) return;
+  currentVideoBloom = bloom;
+  if (!bloom || !bloom.videoUrl) { hideVideo(); return; }
+  bgVideo.src = bloom.videoUrl;
+  if (typeof startTime === 'number' && isFinite(startTime)) {
+    const applyTime = () => { try { bgVideo.currentTime = startTime; } catch(e){} };
+    if (bgVideo.readyState >= 1) applyTime();
+    else bgVideo.addEventListener('loadedmetadata', applyTime, { once: true });
+  }
+  bgVideo.play().catch(err => console.warn('[video]', err.message));
+  bgWrap.classList.add('active');
+  pageMap.classList.add('video-active');
+}
+function hideVideo() {
+  bgWrap.classList.remove('active');
+  bgWrap.classList.remove('clickable');
+  pageMap.classList.remove('video-active');
+  currentVideoBloom = null;
+  setTimeout(() => {
+    if (!currentVideoBloom) {
+      bgVideo.pause();
+      bgVideo.removeAttribute('src');
+      bgVideo.load();
+    }
+  }, 650);
+}
+function scheduleVideo(bloom) {
+  if (videoTimer) clearTimeout(videoTimer);
+  videoTimer = setTimeout(() => showVideoFor(bloom), 250);
+}
+function cancelVideo() {
+  if (videoTimer) { clearTimeout(videoTimer); videoTimer = null; }
+  hideVideo();
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function formatTime(hour) {
+  return `${String(Math.floor(hour)).padStart(2,'0')}:${String(Math.floor((hour%1)*60)).padStart(2,'0')}`;
+}
+
+function showCardAtCursor(e) {
+  card.classList.add('visible');
+  requestAnimationFrame(() => {
+    const margin = 10;
+    const r = card.getBoundingClientRect();
+    let cx = e.clientX + 12, cy = e.clientY + 12;
+    if (cx + r.width > W - margin) cx = e.clientX - r.width - 12;
+    if (cy + r.height > H - margin) cy = e.clientY - r.height - 12;
+    cx = Math.max(margin, Math.min(cx, W - r.width - margin));
+    cy = Math.max(margin, Math.min(cy, H - r.height - margin));
+    card.style.left = cx + 'px';
+    card.style.top  = cy + 'px';
+  });
+}
+
+mapStage.addEventListener('mousedown', (e) => {
+  if (state.page !== 'map') return; // no dragging while on flow
+  view.isDragging = true;
+  view.dragStart = { x: e.clientX, y: e.clientY, vx: view.targetX, vy: view.targetY };
+  cursor.classList.add('dragging');
+});
+window.addEventListener('mouseup', () => {
+  view.isDragging = false;
+  cursor.classList.remove('dragging');
+});
+
+window.addEventListener('mousemove', (e) => {
+  view.mouseX = e.clientX;
+  view.mouseY = e.clientY;
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+
+  // only run map hover logic when map page is active
+  if (state.page !== 'map') return;
+
+  if (view.isDragging && view.dragStart) {
+    const dx = e.clientX - view.dragStart.x;
+    const dy = e.clientY - view.dragStart.y;
+    view.targetX = view.dragStart.vx - dx / view.scale;
+    view.targetY = view.dragStart.vy - dy / view.scale;
+  }
+
+  let hit = null, hitTree = null;
+  for (const b of state.blooms) {
+    if (b.hitTest(e.clientX, e.clientY)) { hit = b; break; }
+  }
+  if (!hit) hitTree = findTreeAtScreenPos(e.clientX, e.clientY, 14);
+  currentHoverBloom = hit;
+
+  if (hit) {
+    // Bloom: same structure as a tree (name, latin, address) + date/time at bottom
+    const treeName = hit.matchedTree?.species || 'unknown tree';
+    cardTree.textContent = treeName;
+    cardLatin.textContent = hit.matchedTree?.latin || '';
+    // Address same structure as NY data: street, borough, zip.
+    // Bag's Are.na address may be "1041 Fulton St, Brooklyn, 11238, NY" — take the
+    // street (before first comma), then borough (zip_city) + zip from matched tree.
+    if (hit.matchedTree && (hit.matchedTree.zip_city || hit.matchedTree.zipcode)) {
+      const street = (hit.address || '').split(',')[0].trim() || hit.matchedTree.address || '';
+      const parts = [street, hit.matchedTree.zip_city, hit.matchedTree.zipcode].filter(Boolean);
+      cardAddress.textContent = parts.join(', ');
+    } else {
+      cardAddress.textContent = hit.address || '';
+    }
+    cardDate.textContent = formatDate(hit.date);
+    cardTime.textContent = formatTime(hit.hour);
+    cardDatetime.style.display = '';   // show date/time row
+    showCardAtCursor(e);
+    scheduleVideo(hit);
+  } else if (hitTree) {
+    // Tree: name, latin, full address — no date/time
+    const treeName = hitTree.species || 'unknown tree';
+    cardTree.textContent = treeName;
+    cardLatin.textContent = hitTree.latin || '';
+    const parts = [hitTree.address, hitTree.zip_city, hitTree.zipcode].filter(Boolean);
+    cardAddress.textContent = parts.join(', ');
+    cardDate.textContent = '';
+    cardTime.textContent = '';
+    cardDatetime.style.display = 'none';  // hide date/time row for trees
+    showCardAtCursor(e);
+    cancelVideo();
+  } else {
+    card.classList.remove('visible');
+    cancelVideo();
+  }
+});
+
+mapStage.addEventListener('wheel', (e) => {
+  if (state.page !== 'map') return;
+  e.preventDefault();
+  const factor = Math.exp(-e.deltaY * 0.0015);
+  view.targetScale = Math.max(0.4, Math.min(12, view.targetScale * factor));
+}, { passive: false });
+
+/* ════════════════════════════════════════════════════════════
+   ROUTER — page switching
+   ════════════════════════════════════════════════════════════ */
+const pages = {
+  flow: document.getElementById('page-flow-wrap'),
+  map: document.getElementById('page-map'),
+  index: document.getElementById('page-index'),
+  grid: document.getElementById('page-grid'),
+};
+const topnav = document.getElementById('topnav');
+const flowNavLinks = document.getElementById('flow-nav-links');
+
+function goTo(pageId) {
+  // Clicking Map while already on Map: do nothing
+  if (state.page === 'map' && pageId === 'map') return;
+
+  state.page = pageId;
+
+  // Reset visibility
+  pages.flow.classList.remove('active');
+  pages.map.classList.remove('active');
+  pages.index.classList.remove('active');
+  pages.grid.classList.remove('active');
+
+  if (pageId === 'flow') {
+    // Homepage overlay + map underneath both visible
+    pages.flow.classList.add('active');
+    pages.map.classList.add('active');
+    // Reset dot opacity to the intro state (50%) when on the homepage
+    dotOpacityScroll = 0.5;
+  } else {
+    pages[pageId].classList.add('active');
+    // Any direct view of the map shows dots at full opacity
+    if (pageId === 'map') dotOpacityScroll = 1;
+  }
+
+  // Top nav visibility: only on map page (index/grid have their own per-page nav)
+  topnav.style.display = (pageId === 'map') ? 'flex' : 'none';
+
+  document.querySelectorAll('.nav-link').forEach(a => {
+    a.classList.toggle('active', a.dataset.nav === pageId);
+  });
+}
+
+let hasEngaged = false; // becomes true once the user first completes the homepage→map reveal
+
+document.querySelectorAll('.nav-link').forEach(a => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = a.dataset.nav;
+    if (target === 'map') {
+      if (state.page === 'map') return;
+      // On repeat visits, hide the count line + blurb — show only the logo title
+      const countLine = document.querySelector('.stage-home .count-line');
+      const blurb = document.querySelector('.stage-home .blurb');
+      if (hasEngaged) {
+        if (countLine) countLine.style.display = 'none';
+        if (blurb) blurb.style.display = 'none';
+      } else {
+        if (countLine) countLine.style.display = '';
+        if (blurb) blurb.style.display = '';
+      }
+      resetFlow();
+      goTo('flow');
+      animateScrollReveal();
+    } else {
+      goTo(target);
+    }
+  });
+});
+
+// Animates scrollProgress from current → 1 over a smooth, gentle duration
+function animateScrollReveal() {
+  const start = scrollProgress;
+  const target = 1;
+  const duration = 2600;
+  const t0 = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - t0) / duration);
+    // Ease-in-out cubic — gentle on both ends
+    const eased = t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    scrollProgress = start + (target - start) * eased;
+    applyScrollProgress();
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ════════════════════════════════════════════════════════════
+   FLOW SCROLL — drives map zoom + text fade simultaneously
+   ════════════════════════════════════════════════════════════ */
+const homeText = document.getElementById('home-text');
+const countLineEl = document.getElementById('count-line');
+const bigTitleEl = document.querySelector('.stage-home .big-title');
+const blurbEls = Array.from(document.querySelectorAll('.stage-home .blurb'));
+
+const INITIAL_ZOOM = 0.7;
+const FINAL_ZOOM = 4.0;
+let scrollProgress = 0;     // 0..1
+
+function setActiveBlurb(idx) {
+  blurbEls.forEach((b, i) => b.classList.toggle('active', i === idx));
+}
+
+function applyScrollProgress() {
+  const e = scrollProgress;
+  // Gentler zoom curve — eases in slowly so the map drifts up rather than rushing
+  const eased = e * e * (3 - 2 * e); // smoothstep
+
+  // Map zoom tracks scroll, but stays low longer (text remains the focus)
+  view.targetScale = INITIAL_ZOOM + (FINAL_ZOOM - INITIAL_ZOOM) * eased;
+
+  // Blurb swap across three bands. The map zooms gently the whole time;
+  // text stays fully visible until the final band, then everything fades.
+  let activeIdx;
+  if (e < 0.34) activeIdx = 0;
+  else if (e < 0.68) activeIdx = 1;
+  else activeIdx = 2;
+  setActiveBlurb(activeIdx);
+
+  // Dots: hold at 50% until the third sentence appears (e >= 0.68),
+  // then ramp from 50% → 100% across the remaining scroll.
+  if (e < 0.68) {
+    dotOpacityScroll = 0.5;
+  } else {
+    const k = (e - 0.68) / (1 - 0.68); // 0..1 over the final band
+    dotOpacityScroll = 0.5 + 0.5 * Math.min(1, k);
+  }
+
+  // Title + count-line + current blurb hold full opacity until ~88% scroll,
+  // then fade gradually over the final stretch — long decay, stays readable.
+  let groupOpacity;
+  if (e < 0.88) groupOpacity = 1;
+  else groupOpacity = Math.max(0, 1 - (e - 0.88) / 0.12);
+
+  if (countLineEl) countLineEl.style.opacity = groupOpacity;
+  if (bigTitleEl) bigTitleEl.style.opacity = groupOpacity;
+  blurbEls.forEach((b, i) => {
+    if (i === activeIdx) b.style.opacity = groupOpacity;
+    else b.style.opacity = '';
+  });
+
+  if (e >= 0.999 && state.page === 'flow') {
+    hasEngaged = true;
+    dotOpacityScroll = 1;
+    goTo('map');
+    resetPositionIfEmpty();
+  }
+}
+
+let flowScrollLock = false;
+function onFlowScroll(deltaY) {
+  if (state.page !== 'flow') return;
+  // Slower still — a long, gentle reveal that keeps text readable
+  scrollProgress = Math.max(0, Math.min(1, scrollProgress + deltaY * 0.00034));
+  applyScrollProgress();
+}
+
+window.addEventListener('wheel', (e) => {
+  if (state.page === 'flow') {
+    e.preventDefault();
+    onFlowScroll(e.deltaY);
+  }
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if (state.page === 'flow') {
+    if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); onFlowScroll(80); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); onFlowScroll(-80); }
+  }
+});
+
+// Touch scroll on flow page
+let touchY = null;
+window.addEventListener('touchstart', (e) => {
+  if (state.page === 'flow') touchY = e.touches[0].clientY;
+});
+window.addEventListener('touchmove', (e) => {
+  if (state.page !== 'flow' || touchY == null) return;
+  e.preventDefault();
+  const dy = touchY - e.touches[0].clientY;
+  touchY = e.touches[0].clientY;
+  onFlowScroll(dy * 3);
+}, { passive: false });
+window.addEventListener('touchend', () => { touchY = null; });
+
+// Reset flow when returning to it from another page
+function resetFlow() {
+  scrollProgress = 0;
+  applyScrollProgress();
+  view.scale = INITIAL_ZOOM;
+}
+
+/* ════════════════════════════════════════════════════════════
+   INDEX PAGE
+   ════════════════════════════════════════════════════════════ */
+function buildIndexRows() {
+  const container = document.getElementById('index-rows');
+  container.innerHTML = '';
+  for (const entry of state.entries) {
+    const row = document.createElement('div');
+    row.className = 'index-row';
+    const treeName = entry.matchedTree?.species || 'tree';
+    const bagAddress = entry.address || '';
+    row.innerHTML = `
+      <div class="col-tree">${escapeHtml(treeName)}</div>
+      <div class="col-addr">${escapeHtml(bagAddress)}</div>
+      <div class="col-date">${formatDate(entry.date)}</div>
+      <div class="col-time">${formatTime(entry.hour)}</div>
+    `;
+    row.addEventListener('click', () => {
+      const bloom = state.blooms.find(b => b.entry.id === entry.id);
+      revealVideoFullscreen(entry, bloom);
+    });
+    container.appendChild(row);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ════════════════════════════════════════════════════════════
+   GRID PAGE — randomized cell order each visit
+   ════════════════════════════════════════════════════════════ */
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildGrid() {
+  const container = document.getElementById('grid-cells');
+  container.innerHTML = '';
+  // Sorted newest-first (already sorted in state.entries on init)
+  for (const entry of state.entries) {
+    const cell = document.createElement('div');
+    cell.className = 'grid-cell';
+    const treeName = entry.matchedTree?.species || 'tree';
+    const bagAddress = entry.address || '';
+    cell.innerHTML = `
+      <div class="grid-cell-meta">
+        <div class="gcm-addr">${escapeHtml(bagAddress)}</div>
+        <div class="gcm-time">${formatTime(entry.hour)}</div>
+        <div class="gcm-date">${formatDate(entry.date)}</div>
+      </div>
+      <div class="grid-cell-video-wrap">
+        ${entry.imageUrl ? `<img src="${entry.imageUrl}" alt="" loading="lazy">` : ''}
+        ${entry.videoUrl ? `<video muted loop playsinline preload="none" data-src="${entry.videoUrl}"></video>` : ''}
+      </div>
+    `;
+    const video = cell.querySelector('video');
+    let hoverActive = false;
+    if (video) {
+      video.addEventListener('playing', () => {
+        if (hoverActive) video.classList.add('ready');
+      });
+    }
+    cell.addEventListener('mouseenter', () => {
+      if (!video) return;
+      hoverActive = true;
+      if (!video.src) {
+        video.src = video.dataset.src;
+        video.load();
+      }
+      const tryPlay = () => { if (hoverActive) video.play().catch(()=>{}); };
+      if (video.readyState >= 2) tryPlay();
+      else video.addEventListener('canplay', tryPlay, { once: true });
+    });
+    cell.addEventListener('mouseleave', () => {
+      if (!video) return;
+      hoverActive = false;
+      video.classList.remove('ready');  // hide video, image shows again — no white gap
+      video.pause();
+    });
+    cell.addEventListener('mouseenter', () => {
+      cursor.classList.add('dragging'); // solid cursor on hover
+    });
+    cell.addEventListener('mouseleave', () => {
+      cursor.classList.remove('dragging');
+    });
+    cell.addEventListener('click', () => {
+      expandCellToFullscreen(cell, entry);
+    });
+    container.appendChild(cell);
+  }
+}
+
+/* Index click: reveal the bloom's video straight to fullscreen (0 → 100%),
+   no map glimpse first. A fullscreen video overlay fades + scales in, then
+   hands off to the map's own video underneath. */
+function revealVideoFullscreen(entry, bloom) {
+  videoOrigin = { page: 'index', scrollTop: document.getElementById('page-index').scrollTop };
+  const overlay = document.createElement('div');
+  overlay.id = 'expand-overlay';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.classList.add('settled'); // no edge feather — it's already fullscreen
+
+  if (entry.videoUrl) {
+    const v = document.createElement('video');
+    v.src = entry.videoUrl;
+    v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    overlay.appendChild(v);
+    v.play().catch(()=>{});
+  } else if (entry.imageUrl) {
+    const img = document.createElement('img');
+    img.src = entry.imageUrl;
+    overlay.appendChild(img);
+  }
+
+  // Start slightly scaled down + transparent, then animate to full
+  overlay.style.transform = 'scale(1.06)';
+  document.body.appendChild(overlay);
+  void overlay.offsetWidth;
+  overlay.classList.add('entering');         // opacity 0 → 1
+  requestAnimationFrame(() => {
+    overlay.style.transform = 'scale(1)';     // settle to full
+  });
+
+  // After the reveal, set up the map underneath and cross-fade to it
+  setTimeout(() => {
+    goTo('map');
+    if (bloom) {
+      view.x = bloom.wx; view.y = bloom.wy;
+      view.targetX = bloom.wx; view.targetY = bloom.wy;
+      view.scale = 6; view.targetScale = 6;
+      currentHoverBloom = bloom;
+      showVideoFor(bloom);
+      bgWrap.classList.add('clickable');
+    }
+    setTimeout(() => {
+      overlay.classList.add('gone');
+      setTimeout(() => overlay.remove(), 470);
+    }, 180);
+  }, 620);
+}
+
+function expandCellToFullscreen(cell, entry) {
+  const videoWrap = cell.querySelector('.grid-cell-video-wrap');
+  if (!videoWrap) return;
+  videoOrigin = { page: 'grid', scrollTop: document.getElementById('page-grid').scrollTop };
+  const rect = videoWrap.getBoundingClientRect();
+  const bloom = state.blooms.find(b => b.entry.id === entry.id);
+
+  // Build the overlay clone, sized + positioned exactly over the cell
+  const overlay = document.createElement('div');
+  overlay.id = 'expand-overlay';
+  overlay.style.top = rect.top + 'px';
+  overlay.style.left = rect.left + 'px';
+  overlay.style.width = rect.width + 'px';
+  overlay.style.height = rect.height + 'px';
+
+  // Clone whatever is currently visible (video if playing, else image)
+  const existingVideo = cell.querySelector('video');
+  const existingImg = cell.querySelector('img');
+  let cloneVideo = null;
+  if (existingVideo && existingVideo.src && existingVideo.classList.contains('ready')) {
+    const v = document.createElement('video');
+    v.src = existingVideo.src;
+    v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    try { v.currentTime = existingVideo.currentTime; } catch(e){}
+    overlay.appendChild(v);
+    v.play().catch(()=>{});
+    cloneVideo = v;
+  } else if (existingImg) {
+    const img = document.createElement('img');
+    img.src = existingImg.src;
+    overlay.appendChild(img);
+  }
+
+  document.body.appendChild(overlay);
+
+  // Compute the scale needed to grow from the cell size to fully cover the viewport.
+  const scaleX = window.innerWidth / rect.width;
+  const scaleY = window.innerHeight / rect.height;
+  const scale = Math.max(scaleX, scaleY) * 1.05; // slight overscan so no edges show
+  const cellCx = rect.left + rect.width / 2;
+  const cellCy = rect.top + rect.height / 2;
+  const dx = (window.innerWidth / 2) - cellCx;
+  const dy = (window.innerHeight / 2) - cellCy;
+
+  // Fade the overlay in at its starting position/size
+  void overlay.offsetWidth;
+  overlay.classList.add('entering');
+
+  // Grow: scale up + drift to center (fast soft ease). Map is NOT set up yet,
+  // so the only thing visible growing is this single cell.
+  requestAnimationFrame(() => {
+    overlay.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+  });
+
+  // When the growth finishes (~640ms), drop the feathered edge mask for a crisp
+  // full frame, THEN set up the map underneath and cross-fade to it.
+  setTimeout(() => {
+    overlay.classList.add('settled');
+    // Now prepare the map underneath (hidden behind the now-fullscreen overlay)
+    goTo('map');
+    if (bloom) {
+      view.x = bloom.wx; view.y = bloom.wy;
+      view.targetX = bloom.wx; view.targetY = bloom.wy;
+      view.scale = 6; view.targetScale = 6;
+      currentHoverBloom = bloom;
+      const syncTime = cloneVideo ? cloneVideo.currentTime : undefined;
+      showVideoFor(bloom, syncTime);
+      bgWrap.classList.add('clickable');
+    }
+    // Only fade the overlay out once the map's video is genuinely painting —
+    // this removes the 1-frame white/empty gap during the handoff.
+    let faded = false;
+    const fadeOut = () => {
+      if (faded) return;
+      faded = true;
+      overlay.classList.add('gone');
+      setTimeout(() => overlay.remove(), 470);
+    };
+    if (bloom && bgVideo) {
+      bgVideo.addEventListener('playing', () => setTimeout(fadeOut, 60), { once: true });
+      setTimeout(fadeOut, 700); // fallback if the event never fires
+    } else {
+      setTimeout(fadeOut, 180);
+    }
+  }, 640);
+}
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════ */
+function snapBloomsToTrees() {
+  let snapped = 0, borrowed = 0, farBorrowed = 0;
+  for (const b of state.blooms) {
+    if (b.fanned) {
+      const any = findNearestTreeAnyDistance(b.lat, b.lon);
+      if (any) { b.matchedTree = any; b.entry.matchedTree = any; if (any.species) state.bloomSpecies.add(any.species); farBorrowed++; }
+      continue;
+    }
+    const close = findNearestTree(b.lat, b.lon, 12);
+    if (close) {
+      b.matchedTree = close;
+      b.lat = close.lat; b.lon = close.lon;
+      const p = project(b.lat, b.lon); b.wx = p.x; b.wy = p.y;
+      b.entry.matchedTree = close;
+      if (close.species) state.bloomSpecies.add(close.species);
+      snapped++; continue;
+    }
+    const nearby = findNearestTree(b.lat, b.lon, 25);
+    if (nearby) { b.matchedTree = nearby; b.entry.matchedTree = nearby; if (nearby.species) state.bloomSpecies.add(nearby.species); borrowed++; continue; }
+    const any = findNearestTreeAnyDistance(b.lat, b.lon);
+    if (any) { b.matchedTree = any; b.entry.matchedTree = any; if (any.species) state.bloomSpecies.add(any.species); farBorrowed++; }
+  }
+  console.log(`Blooms: ${snapped} snapped, ${borrowed} close-borrowed, ${farBorrowed} far-borrowed of ${state.blooms.length}`);
+}
+
+function animateCount(el, target) {
+  if (!el) return;
+  const duration = 1400;
+  const t0 = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out
+    el.textContent = Math.round(eased * target);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = target;
+  }
+  requestAnimationFrame(tick);
+}
+
+// Align the loader title vertically with the homepage title (horizontal centering
+// is handled by CSS). Only sets `top` so there's no movement on load.
+function positionLoaderTitle() {
+  const loaderTitle = document.querySelector('#loading-screen .loading-title');
+  const homeTitle = document.querySelector('.stage-home .big-title');
+  if (!loaderTitle || !homeTitle) return;
+  const target = homeTitle.getBoundingClientRect();
+  loaderTitle.style.top = target.top + 'px';
+}
+
+function dismissLoading() {
+  const ls = document.getElementById('loading-screen');
+  if (!ls || ls.classList.contains('gone')) return;
+  const loaderTitle = ls.querySelector('.loading-title');
+  const homeTitle = document.querySelector('.stage-home .big-title');
+
+  // Enable the transition first (via .settling), then move — so the slide animates.
+  ls.classList.add('settling');
+  void ls.offsetWidth; // force reflow so the transition is armed
+
+  if (loaderTitle && homeTitle) {
+    // Slide horizontally only — vertical is already aligned to the homepage title.
+    const target = homeTitle.getBoundingClientRect();
+    loaderTitle.style.top = target.top + 'px';   // keep vertical aligned
+    loaderTitle.style.left = target.left + 'px';
+    loaderTitle.style.transform = 'translateX(0)';
+  }
+
+  setTimeout(() => {
+    ls.classList.add('gone');
+    setTimeout(() => ls.remove(), 900);
+  }, 1050);
+}
+
+async function init() {
+  const arenaPromise = fetchArena();
+  loop();
+
+  // Align the loader title vertically with the homepage title (centered horizontally)
+  positionLoaderTitle();
+  window.addEventListener('resize', () => {
+    const ls = document.getElementById('loading-screen');
+    if (ls && !ls.classList.contains('settling') && !ls.classList.contains('gone')) {
+      positionLoaderTitle();
+    }
+  });
+
+  state.entries = await arenaPromise;
+  state.entries.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+  animateCount(document.getElementById('home-count'), state.entries.length);
+
+  state.blooms = state.entries.map((entry, i) => new Bloom(entry, i));
+  spreadOverlappingBlooms(state.blooms, 20);
+
+  buildIndexRows();
+  buildGrid();
+
+  // ── FAST PATH: pre-baked binary ────────────────────────────
+  const gotBinary = await tryLoadBinaryTrees();
+  if (gotBinary) {
+    buildTreeIndex();
+    snapBloomsToTrees();
+    rebuildGridByWorldPos();
+    state.introReady = true;
+    buildIndexRows();
+    buildGrid();
+    dismissLoading();
+    return;
+  }
+
+  // ── FALLBACK: live API, progressive load + relaxation ──────
+  console.log('[trees] No binary found — falling back to live NYC API');
+  const nextOffset = await loadInitialTrees(4);
+  snapBloomsToTrees();
+  await relaxTreePositions();
+  for (const b of state.blooms) {
+    if (b.matchedTree) { b.wx = b.matchedTree.wx; b.wy = b.matchedTree.wy; }
+  }
+  rebuildGridByWorldPos();
+  state.introReady = true;
+  buildIndexRows();
+  buildGrid();
+
+  // Keep the loading screen up until the FULL city has loaded — no laggy experience
+  await loadRemainingTrees(nextOffset);
+  console.log('[trees] Full city load complete:', state.allTrees.length);
+  console.log('[export] Ready. Press Shift+E to download trees.bin + trees-species.json');
+  // Re-snap blooms now that all trees are present (better matches)
+  snapBloomsToTrees();
+  buildIndexRows();
+  buildGrid();
+  dismissLoading();
+}
+
+init();
+
+// "+" upload buttons: highlight light-blue when chosen (before/while Are.na opens),
+// revert when the user comes back to this tab.
+document.querySelectorAll('.plus').forEach(p => {
+  p.addEventListener('click', () => {
+    document.querySelectorAll('.plus').forEach(x => x.classList.add('chosen'));
+  });
+});
+window.addEventListener('focus', () => {
+  document.querySelectorAll('.plus').forEach(x => x.classList.remove('chosen'));
+});
+
+// "+" hover tooltip
+const plusTooltip = document.getElementById('plus-tooltip');
+document.querySelectorAll('.plus').forEach(p => {
+  p.addEventListener('mouseenter', () => {
+    const r = p.getBoundingClientRect();
+    plusTooltip.style.left = r.left + 'px';
+    plusTooltip.style.top = (r.bottom + 12) + 'px';
+    plusTooltip.classList.add('visible');
+  });
+  p.addEventListener('mouseleave', () => {
+    plusTooltip.classList.remove('visible');
+  });
+});
+</script>
+</body>
+</html>
