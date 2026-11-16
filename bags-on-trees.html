@@ -2953,7 +2953,7 @@ document.querySelectorAll('.plus').forEach(p => {
 
   /* ---- tone ramp: one lookup from shading (0 dark .. 1 lit) to colour.
          Mid tone is the light blue from the reference; shadows slide to a saturated violet-blue, highlights to pale ice. ---- */
-  var STOPS = [[0.00, 150, 126, 112], [0.16, 190, 156, 136], [0.27, 226, 190, 170], [0.38, 183, 206, 255], [0.72, 190, 212, 255], [0.88, 208, 224, 255], [1.00, 232, 240, 255]];   // site light blue, with the dots' warm tans (#E1C2AE/#D9A884/#AD9482) in the lights and shadows
+  var STOPS = [[0.00, 136, 136, 138], [0.16, 164, 166, 178], [0.34, 183, 206, 255], [0.66, 190, 212, 255], [0.84, 224, 236, 255], [1.00, 250, 252, 255]];   // site light blue, with the dots' warm tans (#E1C2AE/#D9A884/#AD9482) in the lights and shadows
   /* Accents, at most about a quarter of any colour: warm sunlight on the lit side, leaf sage in the light shade, bark brown in the deepest shade.
      The second index of the table is an accent amount from -1 (sage / bark) to +1 (sun). */
   var NA = 17, LUT = new Uint32Array(NA * 1024);
@@ -3366,14 +3366,14 @@ document.querySelectorAll('.plus').forEach(p => {
           ai = (acc * 8 + 8.5) | 0; if (ai < 0) ai = 0; else if (ai > 16) ai = 16;
           cF = LUT[(ai << 10) | ((ss * 1023) | 0)];
           wf = Af / alpha; ws = As * (1 - Af) / alpha;
-          rr = (cF & 255) * wf + 0x96 * ws; gg = ((cF >> 8) & 255) * wf + 0x7E * ws; bb2 = ((cF >> 16) & 255) * wf + 0x70 * ws;
+          rr = (cF & 255) * wf + 0x80 * ws; gg = ((cF >> 8) & 255) * wf + 0x80 * ws; bb2 = ((cF >> 16) & 255) * wf + 0x82 * ws;
           if (alpha > 1) alpha = 1;
           buf[o] = ((((alpha * 255) | 0) << 24) | ((bb2 | 0) << 16) | ((gg | 0) << 8) | (rr | 0)) >>> 0; continue;
         } else {
           alpha = sa * (1 + 0.3 * GR * nn); ss = shT; acc = 0;
           if (alpha < 0.004) { buf[o] = 0; continue; }
           if (alpha > 1) alpha = 1;
-          buf[o] = 0x00707E96 | (((alpha * 255) | 0) << 24); continue;   // cast shadow is a deep tan (the dots' colour), no grey
+          buf[o] = 0x00828080 | (((alpha * 255) | 0) << 24); continue;   // cast shadow is a deep tan (the dots' colour), no grey
         }
         ss += nn * GR * (0.016 + 0.52 * ss * (1 - ss > 0 ? 1 - ss : 0));
         if (ss < 0) ss = 0; else if (ss > 1) ss = 1;
@@ -3426,23 +3426,17 @@ document.querySelectorAll('.plus').forEach(p => {
 (function () {
   var flag = document.getElementById('flag'), hideT = 0;
   var look = { dx: 0, dy: 0, rot: 0, flip: 1, wide: 1.6 };
-  // Every dot colour on the map, picked at random for each hover. The background grey is only ever used for the darkest shades.
-  var WARM = [[217, 168, 132], [226, 190, 170], [214, 150, 110], [222, 222, 245], [208, 224, 255], [196, 170, 160]];
-  var BLUE = [183, 206, 255];
-  function pick(a) { return a[(Math.random() * a.length) | 0]; }
+  // Light blue, white and the background grey (grey only in the deepest shade). A little variation each hover.
   function newPalette() {
-    var dark = Math.random() < 0.5 ? [138, 136, 136] : [150, 116, 96];      // grey or bark brown, deepest shade only
-    var c1 = pick(WARM), c2 = pick(WARM), c3 = pick(WARM);
-    var hi = Math.random() < 0.5 ? [236, 242, 255] : [244, 228, 214];
+    var j = function (v, d) { return v + (Math.random() - 0.5) * d; };
+    var g = Math.round(j(136, 14));
     if (window.__flagPalette) window.__flagPalette([
-      [0.00, dark[0], dark[1], dark[2]],
-      [0.14, (dark[0] + c1[0]) / 2, (dark[1] + c1[1]) / 2, (dark[2] + c1[2]) / 2],
-      [0.26, c1[0], c1[1], c1[2]],
-      [0.40, BLUE[0], BLUE[1], BLUE[2]],
-      [0.68, 190, 212, 255],
-      [0.80, c2[0], c2[1], c2[2]],
-      [0.90, c3[0], c3[1], c3[2]],
-      [1.00, hi[0], hi[1], hi[2]]
+      [0.00, g, g, g + 2],
+      [0.16, g + 28, g + 30, g + 40],
+      [0.34, 183, 206, 255],
+      [j(0.66, 0.08), 190, 212, 255],
+      [j(0.84, 0.06), 224, 236, 255],
+      [1.00, 250, 252, 255]
     ]);
   }
   function reroll() {   // every hover pins the flag a little differently: nudged, tilted, sometimes mirrored
