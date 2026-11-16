@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#A7A7A7" media="(max-width: 700px)">
+<meta name="theme-color" content="#AAAAAA" media="(max-width: 700px)">
 <meta name="theme-color" content="#AAAAAA" media="(min-width: 701px)">
 <meta name="color-scheme" content="light">
 <title>Bags on trees</title>
@@ -665,7 +665,7 @@
   }
   /* Phones: the full-screen blended texture is skipped (lighter and smoother); the flat grey is set to match the textured look on the computer */
   @media (hover: none), (max-width: 700px) {
-    :root { --bg: #A7A7A7; }
+    :root { --bg: #AAAAAA; }
     body::after { display: none; }
     .bloom-card, #plus-tooltip { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
   }
@@ -698,18 +698,22 @@
     .stage-home .count-line .cl-a, .stage-home .count-line .cl-b { display: block; }
     .stage-home .blurb { max-width: 15em; }
 
-    /* Scroll cue: a light-blue dot that travels upward, in the site's own sans font */
-    .scroll-hint { bottom: 1.4rem; font-size: 0.8rem; font-family: var(--font-sans); }
+    /* Scroll cue: "swipe up" sits exactly where the paragraphs appear, in the same font and size; a light-blue dot below it travels upward and fades before reaching the words */
+    .scroll-hint {
+      left: var(--hint-left, 1.25rem); top: var(--hint-top, 60vh); bottom: auto; transform: none;
+      text-align: left; font-family: var(--font-serif); font-size: 1rem; line-height: 1.38;
+      letter-spacing: 0; text-transform: none; font-weight: 400;
+    }
     .scroll-hint.show { animation: none; opacity: 1; }
     .scroll-hint::after {
       width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
-      margin: .9rem auto 0; transform-origin: center; animation: hintDot 1.8s cubic-bezier(.4,0,.2,1) infinite;
+      margin: .8rem 0 0 2px; transform-origin: center; animation: hintDot 1.8s cubic-bezier(.4,0,.2,1) infinite;
     }
     @keyframes hintDot {
-      0%   { transform: translateY(1.3rem); opacity: 0; }
+      0%   { transform: translateY(1.6rem); opacity: 0; }
       25%  { opacity: 1; }
-      75%  { opacity: 1; }
-      100% { transform: translateY(-1.3rem); opacity: 0; }
+      70%  { opacity: 1; }
+      100% { transform: translateY(0); opacity: 0; }
     }
 
     /* Index: each row becomes two lines — tree + date, then address + time */
@@ -1727,7 +1731,7 @@ function colorForSpecies(species) {
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const LITE = (window.matchMedia('(hover: none) and (pointer: coarse)').matches) || window.innerWidth <= 700;   // phones: lighter drawing
-if (LITE) { const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = '#A7A7A7'; document.documentElement.style.background = '#A7A7A7'; }   // phone browser bar matches the page grey
+if (LITE) { const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = '#AAAAAA'; document.documentElement.style.background = '#AAAAAA'; }   // phone browser bar matches the page grey
 let W, H, DPR, frameN = 0;
 function resize() {
   DPR = Math.min(window.devicePixelRatio || 1, LITE ? 1.5 : 2);
@@ -1763,7 +1767,7 @@ let currentVideoBloom = null;
 // Tracks where a fullscreen video was launched from, so clicking it returns there.
 let videoOrigin = null; // { page: 'grid'|'index', scrollTop: number }
 // Scroll-driven dot opacity: 0.5 until the third intro sentence, ramping to 1.0.
-let dotOpacityScroll = 0.5;
+let dotOpacityScroll = window.innerWidth <= 700 ? 0 : 0.5;
 
 class Bloom {
   constructor(entry, i) {
@@ -2228,7 +2232,7 @@ function goTo(pageId) {
     pages.flow.classList.add('active');
     pages.map.classList.add('active');
     // Reset dot opacity to the intro state (50%) when on the homepage
-    dotOpacityScroll = 0.5;
+    dotOpacityScroll = window.innerWidth <= 700 ? 0 : 0.5;
   } else {
     pages[pageId].classList.add('active');
     // Any direct view of the map shows dots at full opacity
@@ -2315,9 +2319,17 @@ function setActiveBlurb(idx) {
   blurbEls.forEach((b, i) => b.classList.toggle('active', i === idx));
 }
 
+/* Phones: if nobody scrolls for 5 seconds before the map is reached, the dot cue comes back */
+let lastHintE = 0, lastHintMove = performance.now();
+setInterval(() => {
+  if (window.innerWidth > 700 || state.page !== 'flow' || scrollProgress >= 0.98) return;
+  const h = document.querySelector('.scroll-hint');
+  if (h && h.classList.contains('show') && h.classList.contains('gone') && performance.now() - lastHintMove > 5000) h.classList.remove('gone');
+}, 500);
 function applyScrollProgress() {
   const e = scrollProgress;
   const hintEl = document.querySelector('.scroll-hint'); if (hintEl) hintEl.classList.toggle('gone', e > 0.03);   // the cue goes away on the first scroll
+  if (e !== lastHintE) { lastHintE = e; lastHintMove = performance.now(); }
   // Gentler zoom curve — eases in slowly so the map drifts up rather than rushing
   const eased = e * e * (3 - 2 * e); // smoothstep
 
@@ -2340,7 +2352,10 @@ function applyScrollProgress() {
 
   // Dots: hold at 50% until the third sentence appears (e >= 0.68),
   // then ramp from 50% → 100% across the remaining scroll.
-  if (e < 0.68) {
+  if (window.innerWidth <= 700) {
+    // phones: no dots while the text is being read; they fade in as the last paragraph finishes
+    dotOpacityScroll = e < 0.7 ? 0 : Math.min(1, (e - 0.7) / 0.3);
+  } else if (e < 0.68) {
     dotOpacityScroll = 0.5;
   } else {
     const k = (e - 0.68) / (1 - 0.68); // 0..1 over the final band
@@ -2800,7 +2815,18 @@ function positionLoaderTitle() {
 
 // The homepage number counts up only once the loading page is gone and the site is actually in view
 let homeCountStarted = false;
+function placeScrollHint() {   // phones: put "swipe up" exactly where the paragraphs appear
+  if (window.innerWidth > 700) return;
+  const h = document.querySelector('.scroll-hint'), bs = document.querySelector('.stage-home .blurb-stack');
+  if (!h || !bs) return;
+  const r = bs.getBoundingClientRect();
+  h.style.setProperty('--hint-top', Math.round(r.top) + 'px');
+  h.style.setProperty('--hint-left', Math.round(r.left) + 'px');
+}
+window.addEventListener('resize', placeScrollHint);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeScrollHint);
 function startHomeCount() {
+  placeScrollHint();
   const hint = document.querySelector('.scroll-hint'); if (hint) setTimeout(() => hint.classList.add('show'), 600);
   if (homeCountStarted) return;
   homeCountStarted = true;
