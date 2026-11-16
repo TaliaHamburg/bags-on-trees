@@ -698,21 +698,21 @@
     .stage-home .count-line .cl-a, .stage-home .count-line .cl-b { display: block; }
     .stage-home .blurb { max-width: 15em; }
 
-    /* Scroll cue: "swipe up" sits exactly where the paragraphs appear, in the same font and size; a light-blue dot below it travels upward and fades before reaching the words */
+    /* Scroll cue: just the light-blue dot (same size and colour as the loading dot), sitting where the paragraphs appear.
+       It glides smoothly upward from below, fades away at the top, then repeats */
     .scroll-hint {
       left: var(--hint-left, 1.25rem); top: var(--hint-top, 60vh); bottom: auto; transform: none;
-      text-align: left; font-family: var(--font-serif); font-size: 1rem; line-height: 1.38;
-      letter-spacing: 0; text-transform: none; font-weight: 400;
+      font-size: 0; line-height: 0; color: transparent;
     }
     .scroll-hint.show { animation: none; opacity: 1; }
     .scroll-hint::after {
-      width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
-      margin: .8rem 0 0 2px; transform-origin: center; animation: hintDot 1.8s cubic-bezier(.4,0,.2,1) infinite;
+      width: 14px; height: 14px; border-radius: 50%; background: var(--accent);
+      margin: 0; animation: hintDot 2.2s cubic-bezier(.33,0,.2,1) infinite;
     }
     @keyframes hintDot {
-      0%   { transform: translateY(1.6rem); opacity: 0; }
-      25%  { opacity: 1; }
-      70%  { opacity: 1; }
+      0%   { transform: translateY(2.4rem); opacity: 0; }
+      18%  { opacity: 1; }
+      62%  { opacity: 1; }
       100% { transform: translateY(0); opacity: 0; }
     }
 
@@ -946,7 +946,7 @@ const ARENA_SLUG = 'bags-on-trees';
 const IS_TOUCH = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 // Add ?owner to the page address to see notices meant for you (visitors never see them)
 const IS_OWNER = new URLSearchParams(location.search).has('owner');
-if (IS_TOUCH) { const h = document.querySelector('.scroll-hint'); if (h) h.textContent = 'swipe up'; }
+if (IS_TOUCH) { const h = document.querySelector('.scroll-hint'); if (h) h.textContent = window.innerWidth <= 700 ? '' : 'swipe up'; }   // phones show only the dot
 const state = {
   entries: [],          // arena blocks (parsed)
   allTrees: [],         // NYC trees
