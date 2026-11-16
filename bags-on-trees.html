@@ -1,0 +1,3467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bags on trees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.are.na" crossorigin>
+<link rel="preconnect" href="https://data.cityofnewyork.us" crossorigin>
+<link rel="dns-prefetch" href="https://attachments.are.na">
+<link rel="dns-prefetch" href="https://images.are.na">
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@300,400,500,600&f[]=gambarino@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #AAAAAA;
+    --ink: #000000;
+    --grey-2: #333;
+    --grey-3: #666;
+    --grey-4: #c8c5be;
+    --accent: #B7CEFF;
+    --tree-1: #D9A884;
+    --tree-2: #E1C2AE;
+    --tree-3: #AD9482;
+    --font-sans: 'Switzer', -apple-system, 'Helvetica Neue', sans-serif;
+    --font-serif: 'Gambarino', Georgia, serif;
+    /* Grid page — tweak these three to resize the tiles */
+    --grid-cols: 3;
+    --grid-gap: 0rem;
+    --grid-pad: 0.6rem;
+    /* City-concrete texture under everything (fine grain + soft cloudiness + a few pores).
+       It sits BELOW the map canvas, so the dots keep their exact colours.
+       Softer / stronger: change the first number in each  slope='…'  below, or ask me. */
+    --concrete:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.32' numOctaves='2' seed='23' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='discrete' tableValues='0.85 0.90 0.97 1 1 1 1 1 1 1'/%3E%3CfeFuncG type='discrete' tableValues='0.85 0.90 0.97 1 1 1 1 1 1 1'/%3E%3CfeFuncB type='discrete' tableValues='0.85 0.90 0.97 1 1 1 1 1 1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23f)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.38' intercept='0.81'/%3E%3CfeFuncG type='linear' slope='0.38' intercept='0.81'/%3E%3CfeFuncB type='linear' slope='0.38' intercept='0.81'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23f)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='720'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.007' numOctaves='4' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='0.12' intercept='0.94'/%3E%3CfeFuncG type='linear' slope='0.12' intercept='0.94'/%3E%3CfeFuncB type='linear' slope='0.12' intercept='0.94'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23f)'/%3E%3C/svg%3E");
+  }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    cursor: none;
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     SHARED NAVIGATION
+     ────────────────────────────────────────────────────────────── */
+  nav.top {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 80;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: clamp(1.4rem, 3vh, 2rem) clamp(1.5rem, 4vw, 2.5rem);   /* identical on every page, so the nav never jumps */
+    pointer-events: none;
+  }
+  nav.top > * { pointer-events: auto; }
+
+  /* Index & Grid page headers get a solid background so they stay present
+     over the scrolling content. Sharp solid edge, no fade. */
+  nav.top.page-nav {
+    background: var(--bg);
+    padding-top: clamp(1.4rem, 3vh, 2rem);
+    padding-bottom: clamp(1.4rem, 3vh, 2rem);
+  }
+
+  .plus {
+    font-family: var(--font-sans);
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: none;
+    border: none;
+    cursor: none;
+    text-decoration: none;
+    line-height: 1;
+    transition: transform 0.3s ease, color 0.2s ease;
+  }
+  @media (hover: hover) { .plus:hover { color: var(--accent); } }
+  .plus.chosen { color: var(--accent); }
+  .plus.breathing { animation: plusBreath 2.5s ease-in-out infinite; }
+  @keyframes plusBreath {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+  }
+
+  /* "+" hover tooltip popup */
+  #plus-tooltip {
+    position: fixed;
+    z-index: 300;
+    width: calc((100vw - 5rem) * 0.5);   /* narrower: the text runs to 3 lines */   /* two thirds of the page width between the side margins */
+    max-width: none;
+    background: var(--accent);   /* solid light blue */
+    padding: 0.7rem 1.15rem;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #plus-tooltip.visible { opacity: 1; transform: translateY(0); }
+  #plus-tooltip .pt-title {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+    color: var(--ink);
+  }
+  #plus-tooltip .pt-body {
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: clamp(1rem, 2.5vw, 2.2rem);
+  }
+  .nav-link {
+    font-family: var(--font-sans);
+    font-size: clamp(0.95rem, 1.05vw, 1.05rem);
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 400;
+    cursor: none;
+    background: none;
+    border: none;
+    padding: 0;
+    transition: color 0.2s;
+  }
+  .nav-link.active { color: var(--accent); }
+  @media (hover: hover) { .nav-link:hover { color: var(--accent); } }
+
+  /* ──────────────────────────────────────────────────────────────
+     CUSTOM CURSOR (above everything except video pause)
+     ────────────────────────────────────────────────────────────── */
+  .cursor {
+    position: fixed;
+    width: 14px; height: 14px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, background 0.2s;
+  }
+  .cursor.dragging {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     PAGES (single-page app)
+     ────────────────────────────────────────────────────────────── */
+  .page {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+  }
+  .page.active {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 0.6s ease, visibility 0s linear 0s;
+  }
+  /* Scrollable content pages */
+  #page-index.active,
+  #page-grid.active {
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* The homepage overlay sits ABOVE the map so the map can show through */
+  #page-flow-wrap {
+    z-index: 20;
+    background: transparent;
+    pointer-events: none; /* never block — only its nav children take clicks */
+  }
+  #page-flow-wrap nav.top > * { pointer-events: auto; }
+  /* Homepage text itself doesn't intercept clicks either — clicks pass through to map */
+  #page-flow { pointer-events: none; }
+
+  /* ──────────────────────────────────────────────────────────────
+     HOMEPAGE & MAP-INTRO SCROLL STAGES
+     The homepage and 3 map-intro pages share the same scroll
+     mechanism: each is a stage in a scroll-controlled timeline.
+     ────────────────────────────────────────────────────────────── */
+  #page-flow {
+    position: fixed;
+    inset: 0;
+    padding: clamp(5rem, 9vh, 7rem) clamp(1.5rem, 4vw, 2.5rem) clamp(2rem, 6vh, 4rem);
+    overflow: hidden;
+    pointer-events: auto;
+  }
+
+  .flow-stage {
+    position: absolute;
+    inset: clamp(5rem, 9vh, 7rem) clamp(1.5rem, 4vw, 2.5rem) clamp(2rem, 6vh, 4rem);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  .flow-stage.visible { opacity: 1; pointer-events: auto; }
+  /* Homepage text fade is now controlled per-element in JS (title/count/blurb) */
+  #home-text {
+    opacity: 1;
+  }
+
+  /* Homepage: count at top, title in upper-middle, blurb just below — equal gaps */
+  .stage-home {
+    display: grid;
+    grid-template-rows: auto auto auto 1fr;
+    row-gap: clamp(2rem, 5vh, 4rem);
+    justify-items: start;
+    align-items: start;
+    padding-top: clamp(4rem, 12vh, 10rem);
+  }
+  .stage-home .count-line { align-self: start; }
+  .stage-home .big-title  { align-self: start; }
+  .stage-home .blurb-stack {
+    align-self: start;
+    position: relative;
+    /* Doubled gap from the title */
+    margin-top: clamp(2rem, 5vh, 4rem);
+    max-width: 580px;
+    width: 100%;
+  }
+  .stage-home .blurb {
+    position: absolute;
+    top: 0; left: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  .stage-home .blurb.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* HOMEPAGE — big "Bags on trees" + count + paragraph */
+  .stage-home .count-line {
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.2vw, 1.5rem);
+    font-weight: 400;
+    margin-top: 1rem;
+    transition: opacity 0.5s ease;
+  }
+  .stage-home .big-title {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: clamp(3.5rem, 14vw, 16rem);
+    line-height: 0.85;
+    letter-spacing: -0.14em;
+    margin: 0;
+    align-self: flex-start;
+    white-space: nowrap;
+    max-width: 100%;
+    transition: opacity 0.5s ease;
+  }
+  .stage-home .blurb {
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.15vw, 1.4rem);
+    line-height: 1.4;
+    max-width: 580px;
+    margin-bottom: 0;
+  }
+  .stage-home .blurb.active { opacity: 1; }
+
+  /* MAP INTRO stages — single paragraph */
+  .stage-intro p {
+    font-family: var(--font-serif);
+    font-size: clamp(1rem, 1.15vw, 1.4rem);
+    line-height: 1.4;
+    max-width: 580px;
+    margin-top: 18vh;
+    margin-bottom: 0;
+  }
+
+  /* Scroll hint */
+  .scroll-hint {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--grey-3);
+    z-index: 60;
+    pointer-events: none;
+    animation: hintFade 4s ease forwards 1s;
+  }
+  @keyframes hintFade {
+    0%       { opacity: 0; }
+    20%, 70% { opacity: 0.7; }
+    100%     { opacity: 0; }
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     INDEX PAGE
+     ────────────────────────────────────────────────────────────── */
+  #page-index {
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bg);
+  }
+  #page-index .container {
+    /* Padding top clears the nav; horizontal padding 0 so dividers reach the edges */
+    padding: clamp(5rem, 10vh, 7rem) 0 4rem;
+    min-height: 100%;
+  }
+  .index-row {
+    display: grid;
+    grid-template-columns: var(--ix-cols, 1fr 1.1fr 15em 6.6em 3.3em);      /* each column is as wide as its longest entry (measured in JS), so every gap is exactly the same */
+    column-gap: var(--ix-gap, 2.5rem);   /* set in JS so the five columns exactly fill the row, with identical gaps */
+    justify-content: start;
+    align-items: baseline;
+    /* Inner horizontal padding on the row so text aligns, but the border spans full width */
+    padding: 1.1rem clamp(1.5rem, 4vw, 2.5rem);          /* same side boundaries as the header */
+    border-bottom: 1px solid rgba(0,0,0,0.18);
+    font-family: var(--font-sans);
+    font-size: clamp(1rem, 1.2vw, 1.25rem);
+    cursor: none;
+    transition: opacity 0.2s;
+  }
+  /* No top divider — first row has no top border */
+  @media (hover: hover) { .index-row:hover { color: var(--accent); } }
+  .index-row .col-tree { font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.1; }   /* same size as the map footer */
+  .index-row .col-latin { font-family: var(--font-serif); font-style: italic; }   /* botanical name: serif italic, as in the map footer */          /* the tree name stays serif, like the map footer */
+  .index-row .col-time { font-variant-numeric: tabular-nums; }
+
+  /* ──────────────────────────────────────────────────────────────
+     GRID PAGE
+     ────────────────────────────────────────────────────────────── */
+  #page-grid {
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--bg);
+  }
+  #page-grid .container {
+    /* Side padding = nav padding minus the tile padding, so the first tile's
+       text lines up exactly with the "+" in the nav */
+    padding: clamp(5rem, 10vh, 7rem) clamp(1.5rem, 4vw, 2.5rem) 2rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-cols), 1fr);
+    /* tiles stay 12% narrower than their column; that slack becomes the gaps between columns,
+       so the first tile starts at the "+" and the last one ends at the right header boundary */
+    column-gap: calc(12% / (var(--grid-cols) - 1));
+    row-gap: 0;
+    margin-top: 1rem;
+    overflow: hidden;            /* trims the divider lines at the outer edges */
+  }
+  @media (max-width: 900px) { :root { --grid-cols: 2; } }
+  @media (max-width: 560px) { :root { --grid-cols: 1; } .grid { column-gap: 0; } }
+  .grid-cell {
+    display: flex;
+    flex-direction: column;
+    cursor: none;
+    background: none;
+    box-shadow: none;
+    padding: var(--grid-pad) 0;
+  }
+  .grid-cell-meta {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;      /* tree · botanical on line 1; street · date · time on line 2 */
+    gap: 0.15rem 1rem;
+    align-items: baseline;
+    padding-bottom: 0.2rem;                  /* line sits right under the text */
+    border-bottom: 1px solid currentColor;   /* stroke under the caption row, as wide as the video */
+    margin-bottom: 0.9rem;
+    font-family: var(--font-sans);          /* address, time, date: sans, as in the map footer */
+    font-size: 0.95rem;
+  }
+  /* names on the video while hovering: tree name bottom-left, botanical name bottom-right, one line (serif, botanical in italic) */
+  .grid-cell-video-wrap .gcm-names {
+    position: absolute; left: .8rem; right: .8rem; bottom: .7rem; z-index: 3; pointer-events: none;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+    font-family: var(--font-serif); font-size: 1.2rem; line-height: 1.1;
+    color: #fff; mix-blend-mode: difference;
+    opacity: 0; transition: opacity .25s ease;
+  }
+  .grid-cell-video-wrap .gcm-latin { font-style: italic; text-align: right; }
+  .grid-cell:hover .gcm-names, .grid-cell.is-hovered .gcm-names { opacity: 1; }
+  .grid-cell-meta .gcm-latin { grid-column: 2 / -1; grid-row: 1; font-family: var(--font-sans); font-style: normal; }   /* only the tree name is serif; all metadata is sans */
+  .grid-cell-meta .gcm-addr  { grid-column: 1 / 3; grid-row: 1; }
+  .grid-cell-meta .gcm-date  { grid-column: 3; grid-row: 1; }
+  .grid-cell-meta .gcm-time  { grid-column: 4; grid-row: 1; }
+  .grid-cell-meta .gcm-addr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .grid-cell-meta .gcm-time,
+  .grid-cell-meta .gcm-date { color: var(--grey-2); }
+  .grid-cell-meta, .grid-cell-meta > * { transition: color .2s; }
+  @media (hover: hover) {
+    .grid-cell:hover .grid-cell-meta,
+    .grid-cell:hover .grid-cell-meta > * { color: var(--accent); }   /* text + stroke turn the same light blue together */
+  }
+  .grid-cell.is-hovered .grid-cell-meta,
+  .grid-cell.is-hovered .grid-cell-meta > * { color: var(--accent); }
+  .grid-cell-video-wrap {
+    background: none;
+    aspect-ratio: 3 / 4;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+  .grid-cell-video-wrap img,
+  .grid-cell-video-wrap video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* Image always present as the poster underneath */
+  .grid-cell-video-wrap img {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  /* Video sits on top, hidden until it's genuinely playing (no white flash) */
+  .grid-cell-video-wrap video {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .grid-cell-video-wrap video.ready { opacity: 1; }
+  .grid-cell-video-wrap video.poster-frame { opacity: 1; z-index: 1; background: none; }   /* stand-in picture: the clip's first frame */
+
+  /* CINEMATIC EXPAND — soft scale + opacity transition for grid→map */
+  #expand-overlay {
+    position: fixed;
+    z-index: 200;
+    background: #000;
+    overflow: hidden;
+    pointer-events: none;
+    transform-origin: center center;
+    opacity: 0;
+    will-change: transform, opacity;
+    transition: transform 0.62s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+    /* Soft blurred edges while growing — feathered mask around the frame */
+    -webkit-mask-image: radial-gradient(ellipse 130% 130% at center, #000 72%, transparent 100%);
+            mask-image: radial-gradient(ellipse 130% 130% at center, #000 72%, transparent 100%);
+  }
+  #expand-overlay.entering { opacity: 1; }
+  #expand-overlay video,
+  #expand-overlay img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* Once fully grown, drop the feathered mask so the final frame is crisp full-bleed */
+  #expand-overlay.settled {
+    -webkit-mask-image: none;
+            mask-image: none;
+  }
+  #expand-overlay.gone {
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+
+  body.instant .page, body.instant #bg-video-wrap, body.instant #bg-video, body.instant #bg-poster, body.instant .bloom-card { transition: none !important; }
+  /* ──────────────────────────────────────────────────────────────
+     MAP CANVAS PAGE — the data view (formerly the whole app)
+     ────────────────────────────────────────────────────────────── */
+  #page-map { background: var(--bg); }
+  #map-stage {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 5;
+    touch-action: none;
+  }
+  #canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    transition: opacity 0.45s ease;
+  }
+  /* When video plays: map layer drops behind video, hidden */
+  #page-map.video-active #canvas { opacity: 0; }
+  #page-map.video-active { background: #000; }
+
+  /* Background hover-video */
+  #bg-video-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  #bg-video-wrap.active { opacity: 1; }
+  #bg-video-wrap.clickable { pointer-events: auto; cursor: none; }
+  #bg-poster {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none;
+  }
+  #bg-poster.on { display: block; }
+  #bg-video { opacity: 0; transition: opacity .35s ease; }
+  #bg-video.ready { opacity: 1; }
+  #bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Hover info card — image 2 layout: horizontal title row + address line */
+  .bloom-card {
+    position: fixed;
+    z-index: 70;
+    background: rgba(170, 170, 170, 0.4);
+    backdrop-filter: blur(36px) saturate(140%);
+    -webkit-backdrop-filter: blur(36px) saturate(140%);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 1.2rem 1.4rem;
+    min-width: min(280px, calc(100vw - 20px));
+    max-width: min(480px, calc(100vw - 20px));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .bloom-card.visible { opacity: 1; }
+  .card-tree {
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 0.35rem;
+  }
+  .card-latin {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink);
+    line-height: 1.2;
+    margin-bottom: 0.35rem;
+  }
+  .card-latin:empty { display: none; }
+  .card-address {
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--ink);
+    line-height: 1.35;
+  }
+  /* Date + time at the bottom (only present for blooms) */
+  .card-datetime {
+    display: flex;
+    gap: 1.19rem;
+    margin-top: 0.55rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--ink);
+  }
+  .card-datetime:empty { display: none; }
+  .card-date, .card-time { white-space: nowrap; }
+  /* ──────────────────────────────────────────────────────────────
+     LOADING SCREEN — title top-left (matching homepage), breathing dot center
+     ────────────────────────────────────────────────────────────── */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: var(--bg);
+    transition: opacity 0.8s ease;
+  }
+  #loading-screen.gone {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #loading-screen .loading-title {
+    position: absolute;
+    /* Static start: horizontally centered. Vertical set by JS to match homepage title. */
+    left: 0;
+    transform: translateX(var(--title-offset, 0px));   /* starts a short distance right of its final spot */
+    will-change: transform;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: clamp(3.5rem, 14vw, 16rem);
+    letter-spacing: -0.14em;
+    line-height: 0.85;
+    color: var(--ink);
+    white-space: nowrap;
+    max-width: calc(100% - 3rem);
+    /* No transition at start — added only when settling, so it's static on load */
+  }
+  #loading-screen.settling .loading-title {
+    transition: transform 1.7s cubic-bezier(0.65, 0, 0.18, 1);   /* smooth ease-in-out glide */
+  }
+  /* Settle position is set at runtime by JS (measures the real homepage title) */
+  #loading-screen .loading-caption {
+    position: absolute;
+    bottom: calc(clamp(4rem, 14vh, 10rem) + 2.4rem);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: clamp(0.8rem, 1vw, 0.95rem);
+    letter-spacing: 0.04em;
+    color: var(--grey-3);
+    white-space: nowrap;
+    transition: opacity 0.4s ease;
+  }
+  #loading-screen.settling .loading-caption { opacity: 0; }
+  #loading-screen .loading-dot {
+    position: absolute;
+    bottom: clamp(4rem, 14vh, 10rem);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: loadingBreath 1.6s ease-in-out infinite;
+  }
+  #loading-screen.settling .loading-dot { opacity: 0; transition: opacity 0.4s ease; }
+  @keyframes loadingBreath {
+    0%, 100% { transform: translateX(-50%) scale(0.7); opacity: 0.5; }
+    50%      { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     TOUCH DEVICES — no hover, no custom cursor
+     ────────────────────────────────────────────────────────────── */
+  @media (hover: none) {
+    .cursor, #plus-tooltip { display: none !important; }
+  }
+
+  /* ──────────────────────────────────────────────────────────────
+     PHONES / NARROW SCREENS
+     ────────────────────────────────────────────────────────────── */
+  @media (max-width: 700px) {
+    nav.top { padding: 1.1rem 1.25rem; }
+    .nav-links { gap: 1.15rem; }
+    .nav-link { font-size: 1rem; padding: 0.35rem 0; }       /* easier to tap */
+    .plus { font-size: 1.7rem; padding: 0.2rem 0.8rem 0.2rem 0; }
+
+    /* Homepage + loader: bigger logotype that fills the width, text hugs the edges */
+    .stage-home .big-title,
+    #loading-screen .loading-title { font-size: 17vw; }
+    #page-flow { padding: 4.5rem 1.25rem 2rem; }
+    .flow-stage { inset: 4.5rem 1.25rem 2rem; }
+    .stage-home { padding-top: clamp(2rem, 9vh, 5rem); row-gap: 1.6rem; }
+    .stage-home .blurb-stack { margin-top: 1.4rem; max-width: 100%; }
+    .stage-home .blurb { font-size: 1rem; line-height: 1.38; }
+    .stage-home .count-line { font-size: 0.95rem; margin-top: 0; }
+    .stage-intro p { font-size: 1rem; margin-top: 12vh; }
+    .scroll-hint { bottom: 1.4rem; }
+
+    /* Index: each row becomes two lines — tree + date, then address + time */
+    #page-index .container { padding-top: 4.5rem; }
+    .index-row {
+      grid-template-columns: 1fr auto;
+      row-gap: 0.2rem;
+      column-gap: 1rem;
+      padding: 0.9rem 1.25rem;
+    }
+    .index-row .col-tree  { grid-column: 1; grid-row: 1; }
+    .index-row .col-latin { grid-column: 1; grid-row: 2; color: var(--grey-3); font-size: 0.9em; }
+    .index-row .col-latin:empty { display: none; }
+    .index-row .col-addr  { grid-column: 1; grid-row: 3; color: var(--grey-3); font-size: 0.9em; text-align: left; }
+    .index-row .col-date  { grid-column: 2; grid-row: 1; }
+    .index-row .col-time  { grid-column: 2; grid-row: 2; color: var(--grey-3); font-size: 0.9em; }
+
+    /* Grid: one wide tile per row; labels wrap instead of overflowing */
+    #page-grid .container { padding: 4.5rem 1.25rem 1.5rem; }
+    .grid { margin-top: 0.5rem; }
+    .grid-cell-meta { gap: 0.6rem; font-size: 0.85rem; padding-bottom: 0.15rem; }
+  }
+
+  /* Owner notice (only shown when the page is opened with ?owner) */
+  .owner-note {
+    position: fixed;
+    left: 1rem; right: 1rem; bottom: 1rem;
+    z-index: 400;
+    max-width: 460px;
+    padding: 0.9rem 1.1rem;
+    background: rgba(170, 170, 170, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--accent);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+  .owner-note b { font-weight: 500; }
+  .owner-note a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  .owner-note button {
+    position: absolute; top: 0.4rem; right: 0.6rem;
+    background: none; border: none; font-size: 1.1rem; line-height: 1; color: var(--ink); cursor: pointer;
+  }
+  /* Concrete texture on every surface that paints the background */
+  body, #page-map, #page-index, #page-grid, #loading-screen, nav.top.page-nav {
+    background-color: var(--bg);
+    background-image: var(--concrete);
+    background-blend-mode: multiply;
+    background-attachment: fixed;
+  }
+  /* One constant texture layer over the whole site (pages, videos, photos) so everything reads as the same surface.
+     Sits under the hover strip, nav controls' text stays crisp enough; the cursor is above it. Strength = opacity. */
+  body::after {
+    content: ''; position: fixed; inset: 0; z-index: 350; pointer-events: none;
+    background-image: var(--concrete); background-size: auto;
+    mix-blend-mode: multiply; opacity: .55;
+  }
+  /* ──────────────────────────────────────────────────────────────
+     HOVER INFO STRIP — footer of the map
+     Name · Latin · address on the left, date + time on the right.
+     Fades in while hovering (or tapping on a phone), fades out otherwise.
+     ────────────────────────────────────────────────────────────── */
+  .bloom-card {
+    left: 0; right: 0; bottom: 0; top: auto;
+    width: auto; min-width: 0; max-width: none;
+    display: grid; grid-template-columns: 1.1fr 1.1fr 1.7fr 1fr; column-gap: 1.5rem;
+    justify-items: start; align-items: baseline; white-space: nowrap; text-align: left;
+    padding: 0.9rem clamp(1.5rem, 4vw, 2.5rem) 1rem;      /* same side boundaries as the header */
+    border: 0; border-radius: 0; background: none;
+    backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; text-shadow: none;
+    color: var(--ink); mix-blend-mode: multiply;          /* black text multiplied into the map */
+  }
+  .bloom-card .card-tree, .bloom-card .card-latin, .bloom-card .card-address, .bloom-card .card-datetime { margin: 0; min-width: 0; max-width: 100%; }
+  .bloom-card .card-address { overflow: hidden; text-overflow: ellipsis; }
+  .bloom-card .card-datetime { margin-left: 0; justify-self: end; }   /* ends exactly on the right boundary, in line with "Index" */
+  @media (max-width: 700px) {
+    .bloom-card { grid-template-columns: 1fr 1fr; row-gap: .25rem; padding: 1rem 1.25rem 0.9rem; font-size: .8em; }
+  }
+  /* While a video plays: white text with a difference blend, so it always contrasts with the footage */
+  #page-map.video-active .bloom-card { mix-blend-mode: difference; }
+  #page-map.video-active .bloom-card,
+  #page-map.video-active .bloom-card * { color: #fff !important; }
+  /* owner notice moves up so it never sits on the strip */
+  .owner-note { bottom: auto; top: 4.5rem; }
+
+  /* ── WIND FLAG (pinned sheet) — hangs just above the title, loosely follows the cursor ── */
+  #flag {
+    position: fixed; left: 0; top: 0; z-index: 250;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.9s ease;
+    filter: blur(1.6px);      /* softens the stair-stepped edges */
+  }
+  #flag.off { display: none; }
+  #flag canvas { display: block; width: 100%; height: 100%; background: transparent; }
+</style>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="loading-title">Bagsontrees</div>
+  <div class="loading-caption" id="loading-caption">Mapping every tree in New York City</div>
+  <div class="loading-dot"></div>
+</div>
+
+<!-- CUSTOM CURSOR -->
+<div class="cursor" id="cursor"></div>
+
+<!-- "+" HOVER TOOLTIP -->
+<div id="plus-tooltip">
+  <div class="pt-title">Add to the Collection</div>
+  <div class="pt-body">You are heading to Are.na. To contribute, upload your video of a bag on a tree anywhere in NYC.<br>Please include the date, time, and address. Thank you for helping document the wild things happening in our canopy.</div>
+</div>
+
+<!-- GLOBAL TOP NAV (visible on Map; hidden during initial flow and on Index/Grid which have their own) -->
+<nav class="top" id="topnav" style="display:none;">
+  <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" id="plus-btn" aria-label="Upload to the archive">+</a>
+  <div class="nav-links">
+    <button class="nav-link" data-nav="grid">Grid</button>
+    <button class="nav-link" data-nav="map">Map</button>
+    <button class="nav-link" data-nav="index">Index</button>
+  </div>
+</nav>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: HOMEPAGE OVERLAY (sits on top of the map underneath)
+     The map renders behind the homepage text. Scrolling progressively
+     reveals the map by zooming in + fading the homepage text out.
+     ─────────────────────────────────────────────────────────── -->
+<div class="page active" id="page-flow-wrap">
+  <nav class="top" id="flow-nav">
+    <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" id="flow-plus" aria-label="Upload to the archive">+</a>
+    <div class="nav-links" id="flow-nav-links">
+      <button class="nav-link" data-nav="grid">Grid</button>
+      <button class="nav-link" data-nav="map" id="nav-map">Map</button>
+      <button class="nav-link" data-nav="index">Index</button>
+    </div>
+  </nav>
+
+  <div id="page-flow">
+    <section class="flow-stage stage-home visible" data-stage="0" id="home-text">
+      <div class="count-line" id="count-line">In this site current documentation of <span id="home-count">0</span> bags on trees</div>
+      <h1 class="big-title">Bagsontrees</h1>
+      <div class="blurb-stack">
+        <p class="blurb blurb-0 active">Winter Phenomenon is an ongoing archive of plastic bags, rubbish, and random leftovers caught in the naked trees of NYC, primarily during the winter, documenting a visual choreography of wind-curated waste.</p>
+        <p class="blurb blurb-1">Every single dot on this screen represents a tree planted across New York City, all five boroughs, a living network mapped from open data.</p>
+        <p class="blurb blurb-2">The Dark dots on this map indicate trees carrying bags, capturing an unsolved metropolitan phenomenon. This is a living archive. You are invited to contribute to this growing documentation by uploading your own video sightings of bags in the branches.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="scroll-hint">scroll</div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: MAP (the interactive data view)
+     ─────────────────────────────────────────────────────────── -->
+<div class="page active" id="page-map">
+  <div id="map-stage">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="bg-video-wrap">
+    <img id="bg-poster" alt="">
+    <video id="bg-video" muted loop playsinline preload="none"></video>
+  </div>
+  <div class="bloom-card" id="bloom-card">
+    <div class="card-tree" id="card-tree">Tree Name</div>
+    <div class="card-latin" id="card-latin">latin name</div>
+    <div class="card-address" id="card-address">Address</div>
+    <div class="card-datetime" id="card-datetime">
+      <span class="card-date" id="card-date">Date</span>
+      <span class="card-time" id="card-time">Time</span>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: INDEX
+     ─────────────────────────────────────────────────────────── -->
+<div class="page" id="page-index">
+  <nav class="top page-nav">
+    <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" aria-label="Upload to the archive">+</a>
+    <div class="nav-links">
+      <button class="nav-link" data-nav="grid">Grid</button>
+      <button class="nav-link" data-nav="map">Map</button>
+      <button class="nav-link active" data-nav="index">Index</button>
+    </div>
+  </nav>
+  <div class="container">
+    <div id="index-rows"></div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────
+     PAGE: GRID
+     ─────────────────────────────────────────────────────────── -->
+<div class="page" id="page-grid">
+  <nav class="top page-nav">
+    <a href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener" class="plus" aria-label="Upload to the archive">+</a>
+    <div class="nav-links">
+      <button class="nav-link active" data-nav="grid">Grid</button>
+      <button class="nav-link" data-nav="map">Map</button>
+      <button class="nav-link" data-nav="index">Index</button>
+    </div>
+  </nav>
+  <div class="container">
+    <div class="grid" id="grid-cells"></div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   STATE — single source of truth shared across pages
+   ════════════════════════════════════════════════════════════ */
+const ARENA_SLUG = 'bags-on-trees';
+// Phones / tablets: touch is the main input, there is no hover
+const IS_TOUCH = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+// Add ?owner to the page address to see notices meant for you (visitors never see them)
+const IS_OWNER = new URLSearchParams(location.search).has('owner');
+if (IS_TOUCH) { const h = document.querySelector('.scroll-hint'); if (h) h.textContent = 'swipe up'; }
+const state = {
+  entries: [],          // arena blocks (parsed)
+  allTrees: [],         // NYC trees
+  bloomSpecies: new Set(),
+  introReady: false,
+  blooms: [],           // Bloom instances for the map page
+  page: 'flow',         // current page id
+  flowStage: 0,         // 0..2 = home / intro1 / intro2  (map is its own page)
+};
+
+/* ════════════════════════════════════════════════════════════
+   ARE.NA FETCH
+   ════════════════════════════════════════════════════════════ */
+const MONTHS = {
+  january:0, february:1, march:2, april:3, may:4, june:5,
+  july:6, august:7, september:8, october:9, november:10, december:11
+};
+
+function monthIndex(name) {
+  const k = name.toLowerCase();
+  if (k in MONTHS) return MONTHS[k];
+  if (k.length >= 3) for (const m in MONTHS) if (m.startsWith(k.slice(0, 3))) return MONTHS[m];   // "Oct", "Sept"
+  return undefined;
+}
+
+/* Reads date, time, address and coordinates out of an Are.na description.
+   Understands every layout used so far, for example:
+     7 February 2025 at 10:23 ⏎ 1041 Fulton St (+40.6821, -73.9601), Brooklyn, 11238, NY
+     21 September 2026, 00:42:30 ⏎ 149 Broadway, Brooklyn, NY 11211 ⏎ (40.7102° N, 73.9634°)
+     11 October 2026, 00:44:39184 Havemeyer St, Brooklyn, NY 11211(40.711° N, 73.956° W)
+   i.e. "at" or a comma, optional seconds, optional line breaks, optional ° N / ° W marks.
+   (This site is NYC-only, so a longitude with no W/E and no minus sign is read as west.) */
+function parseDescription(desc) {
+  if (!desc) return null;
+  desc = desc.replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ');
+  const re = /(?:(\d{1,2})\s+)?([A-Za-z]+)\s+(\d{4})\s*(?:at|,)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([^(]+?)\s*,?\s*\(\s*([+-]?\d+(?:\.\d+)?)\s*°?\s*([NSns])?\s*,?\s*([+-]?\d+(?:\.\d+)?)\s*°?\s*([EWew])?\s*\)/i;
+  const m = desc.match(re);
+  if (!m) return null;
+  const day = m[1] ? parseInt(m[1], 10) : 1;
+  const month = monthIndex(m[2]);
+  const year = parseInt(m[3], 10);
+  const hour = parseInt(m[4], 10);
+  const minute = parseInt(m[5], 10);
+  const second = m[6] ? parseInt(m[6], 10) : 0;
+  const address = m[7].replace(/\s+/g, ' ').trim().replace(/,\s*$/, '');
+  let lat = parseFloat(m[8]);
+  let lon = parseFloat(m[10]);
+  if (month === undefined || !address || isNaN(lat) || isNaN(lon)) return null;
+  if ((m[9] || '').toUpperCase() === 'S') lat = -Math.abs(lat);
+  const lonHem = (m[11] || '').toUpperCase();
+  if (lonHem === 'W') lon = -Math.abs(lon);
+  else if (lonHem === 'E') lon = Math.abs(lon);
+  else if (lon > 0) lon = -lon;
+  return { date: new Date(year, month, day, hour, minute, second), hour: hour + minute/60, address, lat, lon };
+}
+
+const ARENA_CACHE_KEY = 'bags-on-trees:arena-entries';
+const NOTIFIED_KEY = 'bags-on-trees:notified-ids';
+
+/* An upload only goes on the site when its Are.na description has date, time, address
+   and coordinates. Anything else is left out — and you get told about it:
+   • open the site with ?owner on the end to see a notice on the page
+   • optional: set DATA.notifyTopic for a push notification to your phone (ntfy.app) */
+function handleIncompleteUploads(list) {
+  state.incomplete = list;
+  if (!list.length) return;
+  console.warn(`[arena] ${list.length} upload(s) left out — description is missing date, time, address or coordinates:`,
+    list.map(b => b.title));
+  if (IS_OWNER) showOwnerNote(list);
+  pushNotify(list);
+}
+
+function showOwnerNote(list) {
+  const box = document.createElement('div');
+  box.className = 'owner-note';
+  const links = list.slice(0, 4).map(b =>
+    `<a href="https://www.are.na/block/${b.id}" target="_blank" rel="noopener">${escapeHtml(b.title)}</a>`).join(', ');
+  box.innerHTML = `<button aria-label="Dismiss">×</button>
+    <b>${list.length === 1 ? 'A new upload is' : list.length + ' new uploads are'} not on the site yet.</b><br>
+    Add the date, time, address and coordinates to the description on Are.na and it appears next visit: ${links}${list.length > 4 ? '…' : ''}`;
+  box.querySelector('button').addEventListener('click', () => box.remove());
+  document.body.appendChild(box);
+}
+
+async function pushNotify(list) {
+  if (!DATA.notifyTopic) return;
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '[]'); } catch (_) {}
+  const fresh = list.filter(b => !seen.includes(b.id));
+  if (!fresh.length) return;
+  try {
+    const res = await fetch(`https://ntfy.sh/${encodeURIComponent(DATA.notifyTopic)}`, {
+      method: 'POST',
+      headers: { 'Title': 'Bags on trees - new Are.na upload needs details', 'Click': `https://www.are.na/block/${fresh[0].id}` },
+      body: `Not on the site yet (no date/time/address/coordinates in the description): ${fresh.map(b => b.title).join(', ')}`,
+    });
+    if (res.ok) {
+      try { localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...seen, ...fresh.map(b => b.id)].slice(-200))); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
+function blockToEntry(block) {
+  const parsed = parseDescription(block.description);
+  if (!parsed) {
+    console.warn('[arena] Could not parse:', block.title, block.description);
+    return null;
+  }
+  return {
+    id: block.id,
+    title: block.title || block.generated_title || 'untitled',
+    lat: parsed.lat,
+    lon: parsed.lon,
+    hour: parsed.hour,
+    date: parsed.date,
+    address: parsed.address,
+    videoUrl: block.attachment?.url || null,
+    imageUrl: block.image?.large?.url || block.image?.display?.url || block.image?.original?.url || block.image?.thumb?.url || block.image?.square?.url || null,
+  };
+}
+
+// Bags are fetched live on every visit (one small request) so a new video shows up
+// the moment it is added to Are.na. The last good copy is kept as a fallback.
+async function fetchArena() {
+  const PER = 100;
+  try {
+    const entries = [];
+    const incomplete = [];
+    let total = 0;
+    for (let page = 1; page <= 30; page++) {
+      const res = await fetch(
+        `https://api.are.na/v2/channels/${ARENA_SLUG}/contents?per=${PER}&page=${page}`,
+        { priority: 'high', cache: 'no-cache' });   // always ask Are.na for the latest
+      if (!res.ok) throw new Error(`Arena HTTP ${res.status}`);
+      const data = await res.json();
+      total += data.contents.length;
+      for (const block of data.contents) {
+        const e = blockToEntry(block);
+        if (e) entries.push(e);
+        else if (block.attachment || block.image) {
+          incomplete.push({ id: block.id, title: block.title || block.generated_title || 'untitled' });
+        }
+      }
+      if (data.contents.length < PER) break;
+      if (typeof data.length === 'number' && total >= data.length) break;
+    }
+    console.log(`[arena] Loaded ${entries.length}/${total} blocks`);
+    handleIncompleteUploads(incomplete);
+    try {
+      localStorage.setItem(ARENA_CACHE_KEY, JSON.stringify(
+        entries.map(e => ({ ...e, date: e.date ? e.date.getTime() : null }))));
+    } catch (_) {}
+    return entries;
+  } catch (e) {
+    console.error('[arena] Fetch failed:', e.message);
+    try {
+      const cached = JSON.parse(localStorage.getItem(ARENA_CACHE_KEY) || 'null');
+      if (Array.isArray(cached) && cached.length) {
+        console.warn(`[arena] Using last saved copy (${cached.length} entries)`);
+        return cached.map(c => ({ ...c, date: c.date ? new Date(c.date) : null }));
+      }
+    } catch (_) {}
+    return [];
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   NYC TREES
+   Fast path: load pre-baked binary `trees.bin` (positions already
+   relaxed + species). Fallback: live NYC Open Data API.
+   ════════════════════════════════════════════════════════════ */
+const METERS_PER_DEG_LAT = 111000;
+const PAGE_SIZE = 50000;
+const TREE_FIELDS = 'latitude,longitude,spc_common,spc_latin,address,zipcode,zip_city,tree_dbh,status';
+
+/* ┌──────────────────────────────────────────────────────────────┐
+   │  DATA FILES — the only block you edit when you refresh data │
+   │  Created by build-trees.mjs (run it about every 3 months).   │
+   │  On Cargo: upload the files, use "Copy URL" on each, and     │
+   │  paste the links below.                                      │
+   └──────────────────────────────────────────────────────────────┘ */
+const DATA = {
+  treesBin:       'https://cdn.jsdelivr.net/gh/TaliaHamburg/bags-on-trees@main/trees.bin',
+  treesSpecies:   'https://cdn.jsdelivr.net/gh/TaliaHamburg/bags-on-trees@main/trees-species.json',
+  treesAddresses: 'https://cdn.jsdelivr.net/gh/TaliaHamburg/bags-on-trees@main/trees-addresses.txt',  // optional — street addresses on tree hover cards. '' to skip.
+  version:        '2026-11-16',             // change this when you upload new files
+  maxAgeDays:     90,                     // visitors' browsers re-download after this long regardless
+  notifyTopic:    '',                     // optional phone push when an upload is missing its details (see notes)
+};
+const TREES_BIN_URL = DATA.treesBin;
+const TREES_SPECIES_URL = DATA.treesSpecies;
+
+/* Browser-side cache (IndexedDB). The first visit downloads the files; later visits
+   read them from the visitor's own device until the version changes or 90 days pass.
+   If storage is blocked (private mode, some embeds) it quietly falls back to a normal download. */
+const IDB_NAME = 'bags-on-trees', IDB_STORE = 'files';
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const r = db.transaction(IDB_STORE).objectStore(IDB_STORE).get(key);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function idbPut(key, val) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbPruneExcept(keepKeys) {
+  const db = await idbOpen();
+  return new Promise((resolve) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_STORE);
+    const cur = store.openKeyCursor();
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return;
+      if (!keepKeys.has(c.key)) store.delete(c.key);
+      c.continue();
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+const usedCacheKeys = new Set();
+async function cachedFetch(url, kind /* 'buffer' | 'text' */) {
+  const key = `${DATA.version}|${url}`;
+  usedCacheKeys.add(key);
+  const maxAgeMs = DATA.maxAgeDays * 86400000;
+  let stale = null;
+  try {
+    const hit = await idbGet(key);
+    if (hit) {
+      if (Date.now() - hit.savedAt < maxAgeMs) return hit.data;
+      stale = hit;
+    }
+  } catch (_) {}
+  try {
+    const res = await fetch(url, { priority: 'high' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    const data = kind === 'text' ? await res.text() : await res.arrayBuffer();
+    try { await idbPut(key, { savedAt: Date.now(), data }); } catch (_) {}
+    return data;
+  } catch (e) {
+    if (stale) { console.warn('[trees] refresh failed, using older saved copy:', e.message); return stale.data; }
+    throw e;
+  }
+}
+
+/* Binary format (little-endian):
+   [0]      Uint32  magic 0x42414754 ("TGAB")
+   [4]      Uint32  version (1)
+   [8]      Uint32  count N
+   [12..]   per tree (18 bytes):
+              Float32 wx        (relaxed world x)
+              Float32 wy        (relaxed world y)
+              Float32 lat
+              Float32 lon
+              Uint16  speciesIndex
+   species names come from trees-species.json (array, index = speciesIndex)
+*/
+const BIN_MAGIC = 0x42414754;
+const BIN_BYTES_PER_TREE = 18;
+
+let speciesDict = [];  // index → species common name (latin packed too)
+
+async function tryLoadBinaryTrees() {
+  try {
+    const [buf, spcText] = await Promise.all([
+      cachedFetch(TREES_BIN_URL, 'buffer'),
+      cachedFetch(TREES_SPECIES_URL, 'text'),
+    ]);
+    speciesDict = JSON.parse(spcText); // [{c:"honey locust", l:"Gleditsia triacanthos"}, ...]
+    const dv = new DataView(buf);
+    if (dv.getUint32(0, true) !== BIN_MAGIC) {
+      console.warn('[trees] bad magic in trees.bin');
+      return false;
+    }
+    const count = dv.getUint32(8, true);
+    let off = 12;
+    for (let i = 0; i < count; i++) {
+      const wx = dv.getFloat32(off, true); off += 4;
+      const wy = dv.getFloat32(off, true); off += 4;
+      const lat = dv.getFloat32(off, true); off += 4;
+      const lon = dv.getFloat32(off, true); off += 4;
+      const spc = dv.getUint16(off, true); off += 2;
+      const dict = speciesDict[spc] || { c: 'unknown', l: '' };
+      const rankHash = Math.abs(Math.sin(lat * 9301 + lon * 49297) * 233280) % 1;
+      state.allTrees.push({
+        lat, lon, wx, wy,
+        dbh: 4,
+        species: dict.c || 'unknown',
+        latin: dict.l || '',
+        address: '', zipcode: '', zip_city: '',
+        rank: rankHash,
+      });
+    }
+    console.log(`[trees] Loaded ${count} from hosted files (fast path)`);
+    return true;
+  } catch (e) {
+    console.warn('[trees] Binary load failed, will use API:', e.message);
+    return false;
+  }
+}
+
+/* Street addresses for tree hover cards. Loaded AFTER the map is up (never blocks the
+   intro), skipped on data-saver connections, and optional — without it hover cards just
+   show species + Latin name. File = header line "TREES<tab>count", a JSON line with the
+   borough/city list, then one line per tree (same order as trees.bin): street<tab>cityIndex<tab>zip */
+async function loadTreeAddresses() {
+  if (!DATA.treesAddresses) return;
+  if (navigator.connection && navigator.connection.saveData) return;
+  try {
+    const txt = await cachedFetch(DATA.treesAddresses, 'text');
+    const lines = txt.split('\n');
+    const head = (lines[0] || '').split('\t');
+    if (head[0] !== 'TREES' || parseInt(head[1], 10) !== state.allTrees.length) {
+      console.warn('[trees] addresses file does not match trees.bin — skipped');
+      return;
+    }
+    const cities = JSON.parse(lines[1] || '[]');
+    for (let i = 0; i < state.allTrees.length; i++) {
+      const l = lines[i + 2];
+      if (!l) continue;
+      const p = l.split('\t');
+      const t = state.allTrees[i];
+      t.address = p[0] || '';
+      t.zip_city = cities[+p[1]] || '';
+      t.zipcode = p[2] || '';
+    }
+    console.log('[trees] Street addresses attached');
+    idbPruneExcept(usedCacheKeys).catch(() => {});
+  } catch (e) {
+    console.warn('[trees] addresses not loaded:', e.message);
+  }
+}
+
+async function fetchTreePage(offset) {
+  const url = `https://data.cityofnewyork.us/resource/uvpi-gqnh.json` +
+              `?$select=${TREE_FIELDS}` +
+              `&$where=status='Alive' AND latitude IS NOT NULL` +
+              `&$limit=${PAGE_SIZE}` +
+              `&$offset=${offset}`;
+  const res = await fetch(url, { priority: 'high' });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[trees] HTTP ${res.status}:`, body.slice(0,300));
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data
+    .filter(t => t.latitude && t.longitude)
+    .map(t => {
+      const lat = parseFloat(t.latitude);
+      const lon = parseFloat(t.longitude);
+      const p = project(lat, lon);
+      const rankHash = Math.abs(Math.sin(lat * 9301 + lon * 49297) * 233280) % 1;
+      return {
+        lat, lon, wx: p.x, wy: p.y,
+        dbh: parseInt(t.tree_dbh) || 4,
+        species: t.spc_common || 'unknown',
+        latin: t.spc_latin || '',
+        address: t.address || '',
+        zipcode: t.zipcode || '',
+        zip_city: t.zip_city || '',
+        rank: rankHash,
+      };
+    });
+}
+
+async function loadInitialTrees(maxPages = 4) {
+  let offset = 0;
+  let page = 0;
+  while (page < maxPages) {
+    page++;
+    let batch;
+    try { batch = await fetchTreePage(offset); }
+    catch (e) { console.warn(`[trees] page ${page} failed:`, e.message); break; }
+    if (batch.length === 0) break;
+    for (const t of batch) state.allTrees.push(t);
+    console.log(`[trees] initial page ${page}: +${batch.length} (total ${state.allTrees.length})`);
+    if (batch.length < PAGE_SIZE) return offset + PAGE_SIZE;
+    offset += PAGE_SIZE;
+    await new Promise(r => setTimeout(r, 30));
+  }
+  buildTreeIndex();
+  return offset;
+}
+
+async function loadRemainingTrees(startOffset) {
+  let offset = startOffset;
+  let page = Math.floor(offset / PAGE_SIZE);
+  while (true) {
+    page++;
+    let batch;
+    try { batch = await fetchTreePage(offset); }
+    catch (e) { console.warn(`[trees] bg page ${page} failed:`, e.message); break; }
+    if (batch.length === 0) break;
+    insertTreesWithLocalRelax(batch);
+    console.log(`[trees] bg page ${page}: +${batch.length} (total ${state.allTrees.length})`);
+    if (batch.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+/* ────────────────────────────────────────────────────────────
+   EXPORTER — run once to generate trees.bin + trees-species.json
+   Trigger by pressing Shift+E on the map, or call exportTreesBin()
+   in the console. Requires the full dataset + relaxation to have
+   completed first.
+   ──────────────────────────────────────────────────────────── */
+async function exportTreesBin() {
+  if (state.allTrees.length < 100000) {
+    alert(`Only ${state.allTrees.length} trees loaded. Wait for the full city to finish loading first (check console for "Full city load complete").`);
+    return;
+  }
+  // Build species dictionary
+  const dictMap = new Map(); // "common|latin" → index
+  const dictArr = [];
+  function speciesIndex(common, latin) {
+    const key = `${common}|${latin}`;
+    if (dictMap.has(key)) return dictMap.get(key);
+    const idx = dictArr.length;
+    dictMap.set(key, idx);
+    dictArr.push({ c: common, l: latin });
+    return idx;
+  }
+
+  const N = state.allTrees.length;
+  const buf = new ArrayBuffer(12 + N * BIN_BYTES_PER_TREE);
+  const dv = new DataView(buf);
+  dv.setUint32(0, BIN_MAGIC, true);
+  dv.setUint32(4, 1, true);
+  dv.setUint32(8, N, true);
+  let off = 12;
+  for (const t of state.allTrees) {
+    const spc = speciesIndex(t.species || 'unknown', t.latin || '');
+    dv.setFloat32(off, t.wx, true); off += 4;
+    dv.setFloat32(off, t.wy, true); off += 4;
+    dv.setFloat32(off, t.lat, true); off += 4;
+    dv.setFloat32(off, t.lon, true); off += 4;
+    dv.setUint16(off, spc, true); off += 2;
+  }
+
+  // Download trees.bin
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'trees.bin';
+  a.click();
+
+  // Download trees-species.json
+  const spcBlob = new Blob([JSON.stringify(dictArr)], { type: 'application/json' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(spcBlob);
+  a2.download = 'trees-species.json';
+  setTimeout(() => a2.click(), 400);
+
+  console.log(`[export] Wrote ${N} trees, ${dictArr.length} species. File size ~${(buf.byteLength/1e6).toFixed(1)} MB`);
+}
+window.exportTreesBin = exportTreesBin;
+window.addEventListener('keydown', (e) => {
+  if (e.shiftKey && (e.key === 'E' || e.key === 'e')) exportTreesBin();
+});
+
+/* ════════════════════════════════════════════════════════════
+   PROJECTION & GRID
+   ════════════════════════════════════════════════════════════ */
+const NYC_CENTER = { lat: 40.72, lon: -73.97 };
+const SCALE_FACTOR = 12000;
+function project(lat, lon) {
+  return { x: (lon - NYC_CENTER.lon) * SCALE_FACTOR, y: (NYC_CENTER.lat - lat) * SCALE_FACTOR };
+}
+
+const GRID_DEG = 0.002;
+const treeGrid = new Map();
+function gridKey(lat, lon) { return `${Math.floor(lat/GRID_DEG)},${Math.floor(lon/GRID_DEG)}`; }
+function buildTreeIndex() {
+  treeGrid.clear();
+  for (const t of state.allTrees) {
+    const k = gridKey(t.lat, t.lon);
+    if (!treeGrid.has(k)) treeGrid.set(k, []);
+    treeGrid.get(k).push(t);
+  }
+}
+function findNearestTree(lat, lon, maxDistMeters = 8) {
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  const baseLat = Math.floor(lat / GRID_DEG);
+  const baseLon = Math.floor(lon / GRID_DEG);
+  let best = null, bestDist = Infinity;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const cell = treeGrid.get(`${baseLat + dy},${baseLon + dx}`);
+      if (!cell) continue;
+      for (const t of cell) {
+        const dLat = (t.lat - lat) * METERS_PER_DEG_LAT;
+        const dLon = (t.lon - lon) * METERS_PER_DEG_LAT * cosLat;
+        const d = Math.sqrt(dLat*dLat + dLon*dLon);
+        if (d < bestDist) { bestDist = d; best = t; }
+      }
+    }
+  }
+  return bestDist < maxDistMeters ? best : null;
+}
+
+// Always returns the nearest tree, expanding the search radius until one is found.
+// Used to borrow species data even when blooms are far from any census tree.
+function findNearestTreeAnyDistance(lat, lon) {
+  if (!treeGrid.size) return null;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  const baseLat = Math.floor(lat / GRID_DEG);
+  const baseLon = Math.floor(lon / GRID_DEG);
+  let best = null, bestDist = Infinity;
+  // Expand outward in rings until we find at least one tree (then take the closest from that ring + the one before)
+  for (let r = 1; r <= 50; r++) {
+    let foundAny = false;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        // Only check the perimeter of this ring
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const cell = treeGrid.get(`${baseLat + dy},${baseLon + dx}`);
+        if (!cell) continue;
+        foundAny = true;
+        for (const t of cell) {
+          const dLat = (t.lat - lat) * METERS_PER_DEG_LAT;
+          const dLon = (t.lon - lon) * METERS_PER_DEG_LAT * cosLat;
+          const d = Math.sqrt(dLat*dLat + dLon*dLon);
+          if (d < bestDist) { bestDist = d; best = t; }
+        }
+      }
+    }
+    // Once we've found at least one tree in the current ring and one ring before, we're confident
+    if (best && r >= 2) break;
+  }
+  return best;
+}
+
+const WORLD_CELL = 100;
+const worldGrid = new Map();
+const treeBounds = { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity, valid: false };
+function computeTreeBounds() {
+  if (!state.allTrees.length) { treeBounds.valid = false; return; }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const t of state.allTrees) {
+    if (t.wx < minX) minX = t.wx;
+    if (t.wx > maxX) maxX = t.wx;
+    if (t.wy < minY) minY = t.wy;
+    if (t.wy > maxY) maxY = t.wy;
+  }
+  treeBounds.minX = minX; treeBounds.maxX = maxX;
+  treeBounds.minY = minY; treeBounds.maxY = maxY;
+  treeBounds.valid = true;
+}
+
+function rebuildGridByWorldPos() {
+  worldGrid.clear();
+  for (const t of state.allTrees) {
+    const cx = Math.floor(t.wx / WORLD_CELL);
+    const cy = Math.floor(t.wy / WORLD_CELL);
+    const k = `${cx},${cy}`;
+    if (!worldGrid.has(k)) worldGrid.set(k, []);
+    worldGrid.get(k).push(t);
+  }
+  computeTreeBounds();
+}
+
+// Clamp a target view position so the user can't pan far past the trees.
+// Allows panning anywhere within the tree bounding box + a small margin.
+function clampViewTarget() {
+  if (!treeBounds.valid) return;
+  const margin = 200; // world units of slack beyond the outermost trees
+  const minX = treeBounds.minX - margin;
+  const maxX = treeBounds.maxX + margin;
+  const minY = treeBounds.minY - margin;
+  const maxY = treeBounds.maxY + margin;
+  view.targetX = Math.max(minX, Math.min(maxX, view.targetX));
+  view.targetY = Math.max(minY, Math.min(maxY, view.targetY));
+}
+
+// If the current view is far from any tree, recenter on the trees' center.
+function resetPositionIfEmpty() {
+  if (!treeBounds.valid) return;
+  const checkRadiusWorld = 600;
+  const cx = Math.floor(view.targetX / WORLD_CELL);
+  const cy = Math.floor(view.targetY / WORLD_CELL);
+  const cellRad = Math.ceil(checkRadiusWorld / WORLD_CELL);
+  let found = false;
+  for (let dy = -cellRad; dy <= cellRad && !found; dy++) {
+    for (let dx = -cellRad; dx <= cellRad && !found; dx++) {
+      if (worldGrid.has(`${cx + dx},${cy + dy}`)) found = true;
+    }
+  }
+  if (!found) {
+    view.x = view.targetX = (treeBounds.minX + treeBounds.maxX) / 2;
+    view.y = view.targetY = (treeBounds.minY + treeBounds.maxY) / 2;
+  }
+}
+
+function findTreeAtScreenPos(mx, my, maxPixels = 14) {
+  if (!worldGrid.size) return null;
+  const wx = (mx - W/2) / view.scale + view.x;
+  const wy = (my - H/2) / view.scale + view.y;
+  const searchRad = Math.ceil(maxPixels / view.scale / WORLD_CELL) + 1;
+  const cx = Math.floor(wx / WORLD_CELL);
+  const cy = Math.floor(wy / WORLD_CELL);
+  const lodMax = lodThreshold(view.scale);
+  const maxPx2 = maxPixels * maxPixels;
+  let best = null, bestDistPx = Infinity;
+  for (let dy = -searchRad; dy <= searchRad; dy++) {
+    for (let dx = -searchRad; dx <= searchRad; dx++) {
+      const cell = worldGrid.get(`${cx + dx},${cy + dy}`);
+      if (!cell) continue;
+      for (const tree of cell) {
+        if (tree.rank > lodMax) continue;
+        const tx = (tree.wx - view.x) * view.scale + W/2;
+        const ty = (tree.wy - view.y) * view.scale + H/2;
+        const ddx = tx - mx, ddy = ty - my;
+        const d2 = ddx*ddx + ddy*ddy;
+        if (d2 < maxPx2 && d2 < bestDistPx) { bestDistPx = d2; best = tree; }
+      }
+    }
+  }
+  return best;
+}
+
+/* ════════════════════════════════════════════════════════════
+   FORCE RELAXATION + INCREMENTAL INSERT
+   ════════════════════════════════════════════════════════════ */
+const MIN_GAP_WORLD = 14;
+const RELAX_ITERATIONS = 4;
+const RELAX_CELL = MIN_GAP_WORLD * 2;
+
+async function relaxTreePositions() {
+  if (state.allTrees.length === 0) return;
+  for (let iter = 0; iter < RELAX_ITERATIONS; iter++) {
+    const cells = new Map();
+    for (let i = 0; i < state.allTrees.length; i++) {
+      const t = state.allTrees[i];
+      const cx = Math.floor(t.wx / RELAX_CELL);
+      const cy = Math.floor(t.wy / RELAX_CELL);
+      const k = `${cx},${cy}`;
+      if (!cells.has(k)) cells.set(k, []);
+      cells.get(k).push(i);
+    }
+    let moved = 0;
+    for (let i = 0; i < state.allTrees.length; i++) {
+      const a = state.allTrees[i];
+      const cx = Math.floor(a.wx / RELAX_CELL);
+      const cy = Math.floor(a.wy / RELAX_CELL);
+      let dxSum = 0, dySum = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const cell = cells.get(`${cx + ox},${cy + oy}`);
+          if (!cell) continue;
+          for (const j of cell) {
+            if (j === i) continue;
+            const b = state.allTrees[j];
+            const dx = a.wx - b.wx;
+            const dy = a.wy - b.wy;
+            const d2 = dx*dx + dy*dy;
+            if (d2 < MIN_GAP_WORLD*MIN_GAP_WORLD && d2 > 0.0001) {
+              const d = Math.sqrt(d2);
+              const push = (MIN_GAP_WORLD - d) * 0.5;
+              dxSum += (dx/d) * push;
+              dySum += (dy/d) * push;
+            }
+          }
+        }
+      }
+      if (dxSum !== 0 || dySum !== 0) {
+        a.wx += dxSum; a.wy += dySum;
+        moved++;
+      }
+    }
+    await new Promise(r => setTimeout(r, 0));
+    if (moved < state.allTrees.length * 0.01) break;
+  }
+}
+
+function insertTreesWithLocalRelax(batch) {
+  const LOCAL_GAP = MIN_GAP_WORLD;
+  const LOCAL_GAP2 = LOCAL_GAP*LOCAL_GAP;
+  for (const t of batch) {
+    state.allTrees.push(t);
+    const llk = gridKey(t.lat, t.lon);
+    if (!treeGrid.has(llk)) treeGrid.set(llk, []);
+    treeGrid.get(llk).push(t);
+    const cx = Math.floor(t.wx / WORLD_CELL);
+    const cy = Math.floor(t.wy / WORLD_CELL);
+    const k = `${cx},${cy}`;
+    if (!worldGrid.has(k)) worldGrid.set(k, []);
+    worldGrid.get(k).push(t);
+  }
+  for (let iter = 0; iter < 3; iter++) {
+    for (const a of batch) {
+      const acx = Math.floor(a.wx / WORLD_CELL);
+      const acy = Math.floor(a.wy / WORLD_CELL);
+      let dxSum = 0, dySum = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          const cell = worldGrid.get(`${acx+ox},${acy+oy}`);
+          if (!cell) continue;
+          for (const b of cell) {
+            if (b === a) continue;
+            const dx = a.wx - b.wx, dy = a.wy - b.wy;
+            const d2 = dx*dx + dy*dy;
+            if (d2 < LOCAL_GAP2 && d2 > 0.0001) {
+              const d = Math.sqrt(d2);
+              const push = (LOCAL_GAP - d) * 0.5;
+              dxSum += (dx/d)*push; dySum += (dy/d)*push;
+            }
+          }
+        }
+      }
+      if (dxSum !== 0 || dySum !== 0) {
+        const oldKey = `${Math.floor(a.wx/WORLD_CELL)},${Math.floor(a.wy/WORLD_CELL)}`;
+        a.wx += dxSum; a.wy += dySum;
+        const newKey = `${Math.floor(a.wx/WORLD_CELL)},${Math.floor(a.wy/WORLD_CELL)}`;
+        if (newKey !== oldKey) {
+          const oldCell = worldGrid.get(oldKey);
+          if (oldCell) {
+            const idx = oldCell.indexOf(a);
+            if (idx >= 0) oldCell.splice(idx, 1);
+          }
+          if (!worldGrid.has(newKey)) worldGrid.set(newKey, []);
+          worldGrid.get(newKey).push(a);
+        }
+      }
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   COLORS — palette only
+   ════════════════════════════════════════════════════════════ */
+let visKey = '', visByColor = {};
+const dotSprites = {};
+function dotSprite(color, r) {
+  const k = color + '|' + DPR;
+  if (dotSprites[k]) return dotSprites[k];
+  const half = r + 1.5, px = Math.ceil(half * 2 * DPR);
+  const c = document.createElement('canvas'); c.width = c.height = px;
+  const x = c.getContext('2d');
+  x.scale(px / (half * 2), px / (half * 2));
+  x.beginPath(); x.arc(half, half, r, 0, Math.PI * 2);
+  x.fillStyle = color; x.fill();
+  x.strokeStyle = DOT_STROKE; x.lineWidth = DOT_STROKE_WIDTH; x.stroke();
+  return (dotSprites[k] = c);
+}
+const SWAY_X = new Float32Array(256), SWAY_Y = new Float32Array(256);
+const PALETTE_COLORS = ['#D9A884', '#E1C2AE', '#AD9482'];
+// Outline on every map dot — same light blue as the cursor (--accent)
+const DOT_STROKE = '#B7CEFF';
+const DOT_STROKE_WIDTH = 1;
+const speciesColorMap = new Map();
+function hashStringIndex(str, modulo) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h) + str.charCodeAt(i);
+  return Math.abs(h) % modulo;
+}
+function colorForSpecies(species) {
+  if (!species || species === 'unknown') species = 'unknown';
+  if (speciesColorMap.has(species)) return speciesColorMap.get(species);
+  const c = PALETTE_COLORS[hashStringIndex(species, PALETTE_COLORS.length)];
+  speciesColorMap.set(species, c);
+  return c;
+}
+
+/* ════════════════════════════════════════════════════════════
+   MAP CANVAS — Bloom class, view, render loop
+   ════════════════════════════════════════════════════════════ */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(DPR, DPR);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const view = {
+  x: 0, y: 0,
+  scale: 0.7,
+  targetX: 0, targetY: 0,
+  targetScale: 0.7,
+  mouseX: W/2, mouseY: H/2,
+  isDragging: false,
+  dragStart: null,
+};
+
+function hash(n) {
+  n = (n << 13) ^ n;
+  return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 0x7fffffff;
+}
+
+let currentHoverBloom = null;
+let currentVideoBloom = null;
+// Tracks where a fullscreen video was launched from, so clicking it returns there.
+let videoOrigin = null; // { page: 'grid'|'index', scrollTop: number }
+// Scroll-driven dot opacity: 0.5 until the third intro sentence, ramping to 1.0.
+let dotOpacityScroll = 0.5;
+
+class Bloom {
+  constructor(entry, i) {
+    this.entry = entry;
+    this.lat = entry.lat;
+    this.lon = entry.lon;
+    this.title = entry.title;
+    this.hour = entry.hour;
+    this.date = entry.date;
+    this.address = entry.address;
+    this.videoUrl = entry.videoUrl;
+    this.imageUrl = entry.imageUrl;
+    this.idx = i;
+    this.seed = i * 12.9898;
+    const p = project(this.lat, this.lon);
+    this.wx = p.x;
+    this.wy = p.y;
+    this.matchedTree = null;
+  }
+  screenPos() {
+    return { x: (this.wx - view.x) * view.scale + W/2, y: (this.wy - view.y) * view.scale + H/2 };
+  }
+  draw(t, scale) {
+    let { x, y } = this.screenPos();
+    if (x < -300 || x > W + 300 || y < -300 || y > H + 300) return;
+    const time = t * 0.0009;
+    const swayX = Math.sin(time + this.seed * 0.3) * 2.4 + Math.sin(time * 2.1 + this.seed) * 0.8;
+    const swayY = Math.cos(time * 0.85 + this.seed * 0.5) * 2.0 + Math.cos(time * 1.7 + this.seed * 2) * 0.6;
+    x += swayX; y += swayY;
+    this._lastDrawX = x; this._lastDrawY = y;
+    const baseR = 2.85;
+    const targetGrow = (currentHoverBloom === this) ? 2 : 0;
+    this._growth = (this._growth ?? 0) + (targetGrow - (this._growth ?? 0)) * 0.18;
+    const dotR = baseR + this._growth;
+    ctx.fillStyle = '#000000';
+    ctx.strokeStyle = DOT_STROKE;
+    ctx.lineWidth = DOT_STROKE_WIDTH;
+    ctx.beginPath();
+    ctx.arc(x, y, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  hitTest(mx, my) {
+    const x = this._lastDrawX ?? this.screenPos().x;
+    const y = this._lastDrawY ?? this.screenPos().y;
+    const dx = mx - x, dy = my - y;
+    return Math.sqrt(dx*dx + dy*dy) < 22;
+  }
+}
+
+function spreadOverlappingBlooms(blooms, minGapWorld = 20) {
+  const buckets = new Map();
+  for (const b of blooms) {
+    const key = `${Math.round(b.wx/minGapWorld)},${Math.round(b.wy/minGapWorld)}`;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(b);
+  }
+  for (const group of buckets.values()) {
+    if (group.length < 2) continue;
+    const cx = group.reduce((s,b)=>s+b.wx,0)/group.length;
+    const cy = group.reduce((s,b)=>s+b.wy,0)/group.length;
+    const radius = minGapWorld * (group.length > 4 ? 1.4 : 1.0);
+    group.forEach((b, i) => {
+      const ang = (i/group.length) * Math.PI * 2;
+      b.wx = cx + Math.cos(ang) * radius;
+      b.wy = cy + Math.sin(ang) * radius;
+      b.fanned = true;
+    });
+  }
+}
+
+function lodThreshold(scale) {
+  const s = Math.max(0.4, Math.min(12, scale));
+  const t = (s - 0.4) / (12 - 0.4);
+  return Math.min(1, 0.02 + Math.pow(t, 0.55) * 1.1);
+}
+
+const INTRO_DURATION = 3500;
+let introStart = null;
+function introProgress(t) {
+  if (!state.introReady) return 0;
+  if (introStart === null) introStart = t;
+  return Math.min(1, (t - introStart) / INTRO_DURATION);
+}
+
+function loop(t = 0) {
+  // Edge-panning: when cursor nears a screen edge on the map page (and not dragging),
+  // continuously pan the view in that direction.
+  if (state.page === 'map' && !view.isDragging && !IS_TOUCH) {
+    const margin = 90;            // px from edge where panning begins
+    const maxSpeed = 14;          // px/frame at the very edge (world px scaled)
+    let panX = 0, panY = 0;
+    const mx = view.mouseX, my = view.mouseY;
+
+    // Top nav zone: when the cursor is up here, the user is aiming for the menu
+    // (the "+" top-left or the links top-right). Suppress ALL edge-panning so the
+    // map doesn't drift while they reach for a button.
+    const navZoneHeight = 96;
+    const inNavZone = my < navZoneHeight;
+
+    if (!inNavZone) {
+      if (mx < margin)         panX = -(1 - mx / margin);
+      else if (mx > W - margin) panX = (1 - (W - mx) / margin);
+    }
+    // top edge pans only in the centre third of the screen, so it never fights the + or the page links
+    if (my < margin && mx > W / 3 && mx < (2 * W) / 3) panY = -(1 - my / margin);
+    else if (my > H - margin) panY = (1 - (H - my) / margin);
+
+    if (panX !== 0 || panY !== 0) {
+      view.targetX += (panX * maxSpeed) / view.scale;
+      view.targetY += (panY * maxSpeed) / view.scale;
+    }
+  }
+
+  // Keep the view within the trees' bounding box (+ margin) — stop panning into the void
+  if (state.page === 'map') clampViewTarget();
+
+  // Slower lerp = smoother, more cinematic transitions
+  view.x += (view.targetX - view.x) * 0.05;
+  view.y += (view.targetY - view.y) * 0.05;
+  view.scale += (view.targetScale - view.scale) * 0.05;
+
+  const intro = introProgress(t);
+  const eased = 1 - Math.pow(1 - intro, 3);
+  const blurAmt = (1 - eased) * 12;
+  canvas.style.filter = blurAmt > 0.5 ? `blur(${blurAmt.toFixed(2)}px)` : 'none';
+  const lodMultiplier = 0.15 + eased * 0.85;
+
+  ctx.clearRect(0, 0, W, H);
+  const px = (view.mouseX / W - 0.5) * 20;
+  const py = (view.mouseY / H - 0.5) * 20;
+  ctx.save();
+  ctx.translate(-px, -py);
+
+  // Trees
+  const treeOpacity = Math.max(0, Math.min(1, (view.scale - 0.4) / 0.4)) * dotOpacityScroll;
+  if (state.allTrees.length > 0 && treeOpacity > 0.02 && worldGrid.size > 0) {
+    const lodMax = lodThreshold(view.scale) * lodMultiplier;
+    const worldLeft = view.x - (W/2)/view.scale;
+    const worldRight = view.x + (W/2)/view.scale;
+    const worldTop = view.y - (H/2)/view.scale;
+    const worldBot = view.y + (H/2)/view.scale;
+    const cellLeft = Math.floor(worldLeft/WORLD_CELL) - 1;
+    const cellRight = Math.floor(worldRight/WORLD_CELL) + 1;
+    const cellTop = Math.floor(worldTop/WORLD_CELL) - 1;
+    const cellBot = Math.floor(worldBot/WORLD_CELL) + 1;
+    // The grouping by colour only changes when the visible cells or the detail level change, so it is cached
+    const lodQ = Math.round(lodMax * 100);
+    const key = cellLeft + ',' + cellRight + ',' + cellTop + ',' + cellBot + ',' + lodQ + ',' + state.allTrees.length;
+    if (key !== visKey) {
+      visKey = key; visByColor = {};
+      for (let cy = cellTop; cy <= cellBot; cy++) {
+        for (let cx = cellLeft; cx <= cellRight; cx++) {
+          const cell = worldGrid.get(`${cx},${cy}`);
+          if (!cell) continue;
+          for (const tree of cell) {
+            if (tree.rank > lodMax) continue;
+            const color = tree._col || (tree._col = colorForSpecies(tree.species));
+            (visByColor[color] || (visByColor[color] = [])).push(tree);
+          }
+        }
+      }
+    }
+    const byColor = visByColor;
+    const dotR = 2.85;
+    // Every tree breathes a little (the bag trees sway more). 256 phase slots are recomputed once per frame;
+    // each tree picks one by position, so it costs almost nothing across hundreds of thousands of dots.
+    const tm = t * 0.0009;
+    for (let i = 0; i < 256; i++) {
+      const ph = i * 2.399963;
+      SWAY_X[i] = Math.sin(tm + ph) * 1.0 + Math.sin(tm * 2.1 + ph * 1.7) * 0.35;
+      SWAY_Y[i] = Math.cos(tm * 0.85 + ph * 0.6) * 0.9 + Math.cos(tm * 1.7 + ph * 2.3) * 0.3;
+    }
+    ctx.globalAlpha = treeOpacity;
+    const half = dotR + 1.5, sz = half * 2;
+    for (const color in byColor) {
+      const spr = dotSprite(color, dotR);      // a pre-drawn dot (fill + light-blue outline), stamped per tree
+      for (const tree of byColor[color]) {
+        const sw = ((tree.wx * 3.1 + tree.wy * 5.7) | 0) & 255;
+        const tx = (tree.wx - view.x) * view.scale + W/2 + SWAY_X[sw];
+        const ty = (tree.wy - view.y) * view.scale + H/2 + SWAY_Y[sw];
+        if (tx < -10 || tx > W+10 || ty < -10 || ty > H+10) continue;
+        ctx.drawImage(spr, tx - half, ty - half, sz, sz);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Blooms
+  ctx.globalAlpha = dotOpacityScroll;
+  for (const b of state.blooms) b.draw(t, view.scale);
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+
+/* ════════════════════════════════════════════════════════════
+   MAP INTERACTION
+   ════════════════════════════════════════════════════════════ */
+const mapStage = document.getElementById('map-stage');
+const bgWrap = document.getElementById('bg-video-wrap');
+const bgVideo = document.getElementById('bg-video');
+const bgPoster = document.getElementById('bg-poster');
+const pageMap = document.getElementById('page-map');
+
+// Clicking the fullscreen video returns to where it was launched from (grid/index),
+// restoring the exact scroll position.
+bgWrap.addEventListener('click', () => {
+  if (!videoOrigin) {
+    if (IS_TOUCH) { cancelVideo(); card.classList.remove('visible'); currentHoverBloom = null; }
+    return;
+  }
+  const origin = videoOrigin;
+  videoOrigin = null;
+  hideVideo();
+  currentHoverBloom = null;
+  goTo(origin.page);
+  const pageEl = document.getElementById('page-' + origin.page);
+  if (pageEl) {
+    // Restore scroll after the page becomes visible
+    requestAnimationFrame(() => { pageEl.scrollTop = origin.scrollTop; });
+  }
+});
+const card = document.getElementById('bloom-card');
+const cardTree = document.getElementById('card-tree');
+const cardDate = document.getElementById('card-date');
+const cardTime = document.getElementById('card-time');
+const cardAddress = document.getElementById('card-address');
+const cardLatin = document.getElementById('card-latin');
+const cardDatetime = document.getElementById('card-datetime');
+const cursor = document.getElementById('cursor');
+
+let videoTimer = null;
+function showVideoFor(bloom, startTime) {
+  if (bloom === currentVideoBloom) return;
+  currentVideoBloom = bloom;
+  if (!bloom || !bloom.videoUrl) { hideVideo(); return; }
+  bgVideo.src = bloom.videoUrl;
+  if (typeof startTime === 'number' && isFinite(startTime)) {
+    const applyTime = () => { try { bgVideo.currentTime = startTime; } catch(e){} };
+    if (bgVideo.readyState >= 1) applyTime();
+    else bgVideo.addEventListener('loadedmetadata', applyTime, { once: true });
+  }
+  bgVideo.play().catch(err => console.warn('[video]', err.message));
+  // Show the bag's still photo straight away (no black), then fade the video in over it once a frame is playing.
+  bgVideo.classList.remove('ready');
+  const token = bloom;
+  const reveal = () => {
+    if (currentVideoBloom !== token) return;
+    bgWrap.classList.add('active');
+    pageMap.classList.add('video-active');
+  };
+  const onPlaying = () => { if (currentVideoBloom === token) bgVideo.classList.add('ready'); };
+  if (bloom.imageUrl) { bgPoster.src = bloom.imageUrl; bgPoster.classList.add('on'); reveal(); }
+  else { bgPoster.classList.remove('on'); bgPoster.removeAttribute('src'); }
+  bgVideo.addEventListener('playing', () => { reveal(); onPlaying(); }, { once: true });
+  if (!bgVideo.paused && bgVideo.readyState >= 3) { reveal(); onPlaying(); }
+}
+function hideVideo() {
+  bgWrap.classList.remove('active');
+  bgWrap.classList.remove('clickable');
+  pageMap.classList.remove('video-active');
+  currentVideoBloom = null;
+  setTimeout(() => {
+    if (!currentVideoBloom) {
+      bgVideo.classList.remove('ready'); bgPoster.classList.remove('on');
+      bgVideo.pause();
+      bgVideo.removeAttribute('src');
+      bgVideo.load();
+    }
+  }, 650);
+}
+function scheduleVideo(bloom) {
+  if (videoTimer) clearTimeout(videoTimer);
+  videoTimer = setTimeout(() => showVideoFor(bloom), 250);
+}
+function cancelVideo() {
+  if (videoTimer) { clearTimeout(videoTimer); videoTimer = null; }
+  hideVideo();
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function formatTime(hour) {
+  const t = Math.round(hour * 60);   // whole minutes — avoids 10:23 showing as 10:22
+  return `${String(Math.floor(t / 60) % 24).padStart(2,'0')}:${String(t % 60).padStart(2,'0')}`;
+}
+
+// The details now live in a strip along the bottom of the map, so they no longer follow the cursor.
+function showCardAtCursor() { card.classList.add('visible'); }
+
+mapStage.addEventListener('mousedown', (e) => {
+  if (IS_TOUCH || state.page !== 'map') return; // no dragging while on flow
+  view.isDragging = true;
+  view.dragStart = { x: e.clientX, y: e.clientY, vx: view.targetX, vy: view.targetY };
+  cursor.classList.add('dragging');
+});
+window.addEventListener('mouseup', () => {
+  view.isDragging = false;
+  cursor.classList.remove('dragging');
+});
+
+/* Shows the card (and bag video) for whatever is under a point.
+   Mouse: hover. Phone: a tap — which also opens the bag video straight away. */
+function applyHover(x, y, isTap) {
+  let hit = null, hitTree = null;
+  for (const b of state.blooms) {
+    if (b.hitTest(x, y)) { hit = b; break; }
+  }
+  if (!hit) hitTree = findTreeAtScreenPos(x, y, isTap ? 26 : 14);
+  currentHoverBloom = hit;
+  const pt = { clientX: x, clientY: y };
+
+  if (hit) {
+    const treeName = hit.matchedTree?.species || 'unknown tree';
+    cardTree.textContent = treeName;
+    cardLatin.textContent = hit.matchedTree?.latin || '';
+    if (hit.matchedTree && (hit.matchedTree.zip_city || hit.matchedTree.zipcode)) {
+      const street = (hit.address || '').split(',')[0].trim() || hit.matchedTree.address || '';
+      const parts = [street, hit.matchedTree.zip_city, hit.matchedTree.zipcode].filter(Boolean);
+      cardAddress.textContent = parts.join(', ');
+    } else {
+      cardAddress.textContent = hit.address || '';
+    }
+    cardDate.textContent = formatDate(hit.date);
+    cardTime.textContent = formatTime(hit.hour);
+    cardDatetime.style.display = '';
+    showCardAtCursor(pt);
+    if (isTap) { showVideoFor(hit); if (hit.videoUrl) bgWrap.classList.add('clickable'); }
+    else scheduleVideo(hit);
+  } else if (hitTree) {
+    cardTree.textContent = hitTree.species || 'unknown tree';
+    cardLatin.textContent = hitTree.latin || '';
+    cardAddress.textContent = [hitTree.address, hitTree.zip_city, hitTree.zipcode].filter(Boolean).join(', ');
+    cardDate.textContent = '';
+    cardTime.textContent = '';
+    cardDatetime.style.display = 'none';
+    showCardAtCursor(pt);
+    cancelVideo();
+  } else {
+    card.classList.remove('visible');
+    cancelVideo();
+  }
+}
+
+window.addEventListener('mousemove', (e) => {
+  if (IS_TOUCH) return;
+  view.mouseX = e.clientX;
+  view.mouseY = e.clientY;
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+
+  // only run map hover logic when map page is active
+  if (state.page !== 'map') return;
+
+  if (view.isDragging && view.dragStart) {
+    const dx = e.clientX - view.dragStart.x;
+    const dy = e.clientY - view.dragStart.y;
+    view.targetX = view.dragStart.vx - dx / view.scale;
+    view.targetY = view.dragStart.vy - dy / view.scale;
+  }
+
+  applyHover(e.clientX, e.clientY, false);
+});
+
+mapStage.addEventListener('wheel', (e) => {
+  if (state.page !== 'map') return;
+  e.preventDefault();
+  const factor = Math.exp(-e.deltaY * 0.0015);
+  view.targetScale = Math.max(0.4, Math.min(20, view.targetScale * factor));
+}, { passive: false });
+
+/* TOUCH: one finger drags the map, two fingers pinch-zoom, a tap opens a dot's card */
+let touchGesture = null;
+mapStage.addEventListener('touchstart', (e) => {
+  if (state.page !== 'map') return;
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    touchGesture = { mode: 'pan', x: t.clientX, y: t.clientY, vx: view.targetX, vy: view.targetY, t0: Date.now(), moved: false };
+  } else if (e.touches.length === 2) {
+    const [a, b] = e.touches;
+    touchGesture = { mode: 'pinch', d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, s0: view.targetScale, moved: true };
+    card.classList.remove('visible');
+  }
+}, { passive: true });
+mapStage.addEventListener('touchmove', (e) => {
+  if (state.page !== 'map' || !touchGesture) return;
+  e.preventDefault();
+  if (touchGesture.mode === 'pan' && e.touches.length === 1) {
+    const t = e.touches[0];
+    const dx = t.clientX - touchGesture.x, dy = t.clientY - touchGesture.y;
+    if (Math.abs(dx) + Math.abs(dy) > 8) { touchGesture.moved = true; card.classList.remove('visible'); }
+    view.targetX = touchGesture.vx - dx / view.scale;
+    view.targetY = touchGesture.vy - dy / view.scale;
+  } else if (touchGesture.mode === 'pinch' && e.touches.length === 2) {
+    const [a, b] = e.touches;
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    view.targetScale = Math.max(0.4, Math.min(20, touchGesture.s0 * d / touchGesture.d0));
+  }
+}, { passive: false });
+mapStage.addEventListener('touchend', (e) => {
+  if (state.page !== 'map' || !touchGesture) return;
+  const g = touchGesture;
+  if (e.touches.length === 0) {
+    touchGesture = null;
+    if (g.mode === 'pan' && !g.moved && Date.now() - g.t0 < 450) {
+      e.preventDefault();            // it was a tap, not a drag
+      applyHover(g.x, g.y, true);
+    }
+  } else if (e.touches.length === 1) {
+    // lifted one finger of a pinch: carry on as a drag from where the other finger is
+    const t = e.touches[0];
+    touchGesture = { mode: 'pan', x: t.clientX, y: t.clientY, vx: view.targetX, vy: view.targetY, t0: 0, moved: true };
+  }
+}, { passive: false });
+mapStage.addEventListener('touchcancel', () => { touchGesture = null; });
+
+/* ════════════════════════════════════════════════════════════
+   ROUTER — page switching
+   ════════════════════════════════════════════════════════════ */
+const pages = {
+  flow: document.getElementById('page-flow-wrap'),
+  map: document.getElementById('page-map'),
+  index: document.getElementById('page-index'),
+  grid: document.getElementById('page-grid'),
+};
+const topnav = document.getElementById('topnav');
+const flowNavLinks = document.getElementById('flow-nav-links');
+
+function goTo(pageId) {
+  // Clicking Map while already on Map: do nothing
+  if (state.page === 'map' && pageId === 'map') return;
+
+  state.page = pageId;
+  if (pageId === 'index') requestAnimationFrame(() => fitIndexColumns());
+
+  // Reset visibility
+  pages.flow.classList.remove('active');
+  pages.map.classList.remove('active');
+  pages.index.classList.remove('active');
+  pages.grid.classList.remove('active');
+
+  if (pageId === 'flow') {
+    // Homepage overlay + map underneath both visible
+    pages.flow.classList.add('active');
+    pages.map.classList.add('active');
+    // Reset dot opacity to the intro state (50%) when on the homepage
+    dotOpacityScroll = 0.5;
+  } else {
+    pages[pageId].classList.add('active');
+    // Any direct view of the map shows dots at full opacity
+    if (pageId === 'map') dotOpacityScroll = 1;
+  }
+
+  // Top nav visibility: only on map page (index/grid have their own per-page nav)
+  if (pageId === 'grid') document.querySelectorAll('.grid-cell.is-hovered').forEach(c => c.classList.remove('is-hovered'));
+  topnav.style.display = (pageId === 'map') ? 'flex' : 'none';
+
+  document.querySelectorAll('.nav-link').forEach(a => {
+    a.classList.toggle('active', a.dataset.nav === pageId);
+  });
+}
+
+let hasEngaged = false; // becomes true once the user first completes the homepage→map reveal
+
+document.querySelectorAll('.nav-link').forEach(a => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = a.dataset.nav;
+    if (target === 'map') {
+      if (state.page === 'map') return;
+      // From the grid or index the map opens straight away: the welcome page never comes back
+      if (state.page !== 'flow') {
+        hasEngaged = true;
+        scrollProgress = 1;
+        applyScrollProgress();
+        goTo('map');
+        return;
+      }
+      // On repeat visits, hide the count line + blurb — show only the logo title
+      const countLine = document.querySelector('.stage-home .count-line');
+      const blurb = document.querySelector('.stage-home .blurb');
+      if (hasEngaged) {
+        if (countLine) countLine.style.display = 'none';
+        if (blurb) blurb.style.display = 'none';
+      } else {
+        if (countLine) countLine.style.display = '';
+        if (blurb) blurb.style.display = '';
+      }
+      resetFlow();
+      goTo('flow');
+      animateScrollReveal();
+    } else {
+      goTo(target);
+    }
+  });
+});
+
+// Animates scrollProgress from current → 1 over a smooth, gentle duration
+function animateScrollReveal() {
+  const start = scrollProgress;
+  const target = 1;
+  const duration = 2600;
+  const t0 = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - t0) / duration);
+    // Ease-in-out cubic — gentle on both ends
+    const eased = t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    scrollProgress = start + (target - start) * eased;
+    applyScrollProgress();
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ════════════════════════════════════════════════════════════
+   FLOW SCROLL — drives map zoom + text fade simultaneously
+   ════════════════════════════════════════════════════════════ */
+const homeText = document.getElementById('home-text');
+const countLineEl = document.getElementById('count-line');
+const bigTitleEl = document.querySelector('.stage-home .big-title');
+const blurbEls = Array.from(document.querySelectorAll('.stage-home .blurb'));
+
+const INITIAL_ZOOM = 0.7;
+const FINAL_ZOOM = 4.0;
+let scrollProgress = 0;     // 0..1
+
+function setActiveBlurb(idx) {
+  blurbEls.forEach((b, i) => b.classList.toggle('active', i === idx));
+}
+
+function applyScrollProgress() {
+  const e = scrollProgress;
+  // Gentler zoom curve — eases in slowly so the map drifts up rather than rushing
+  const eased = e * e * (3 - 2 * e); // smoothstep
+
+  // Map zoom tracks scroll, but stays low longer (text remains the focus)
+  view.targetScale = INITIAL_ZOOM + (FINAL_ZOOM - INITIAL_ZOOM) * eased;
+
+  // Blurb swap across three bands. The map zooms gently the whole time;
+  // text stays fully visible until the final band, then everything fades.
+  let activeIdx;
+  if (e < 0.34) activeIdx = 0;
+  else if (e < 0.68) activeIdx = 1;
+  else activeIdx = 2;
+  setActiveBlurb(activeIdx);
+
+  // Dots: hold at 50% until the third sentence appears (e >= 0.68),
+  // then ramp from 50% → 100% across the remaining scroll.
+  if (e < 0.68) {
+    dotOpacityScroll = 0.5;
+  } else {
+    const k = (e - 0.68) / (1 - 0.68); // 0..1 over the final band
+    dotOpacityScroll = 0.5 + 0.5 * Math.min(1, k);
+  }
+
+  // Title + count-line + current blurb hold full opacity until ~88% scroll,
+  // then fade gradually over the final stretch — long decay, stays readable.
+  let groupOpacity;
+  if (e < 0.88) groupOpacity = 1;
+  else groupOpacity = Math.max(0, 1 - (e - 0.88) / 0.12);
+
+  if (countLineEl) countLineEl.style.opacity = groupOpacity;
+  if (bigTitleEl) bigTitleEl.style.opacity = groupOpacity;
+  blurbEls.forEach((b, i) => {
+    if (i === activeIdx) b.style.opacity = groupOpacity;
+    else b.style.opacity = '';
+  });
+
+  if (e >= 0.999 && state.page === 'flow') {
+    hasEngaged = true;
+    dotOpacityScroll = 1;
+    goTo('map');
+    resetPositionIfEmpty();
+  }
+}
+
+let flowScrollLock = false;
+function onFlowScroll(deltaY) {
+  if (state.page !== 'flow') return;
+  // Slower still — a long, gentle reveal that keeps text readable
+  scrollProgress = Math.max(0, Math.min(1, scrollProgress + deltaY * 0.00034));
+  applyScrollProgress();
+}
+
+window.addEventListener('wheel', (e) => {
+  if (state.page === 'flow') {
+    e.preventDefault();
+    onFlowScroll(e.deltaY);
+  }
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if (state.page === 'flow') {
+    if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); onFlowScroll(80); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); onFlowScroll(-80); }
+  }
+});
+
+// Touch scroll on flow page
+let touchY = null;
+window.addEventListener('touchstart', (e) => {
+  if (state.page === 'flow') touchY = e.touches[0].clientY;
+});
+window.addEventListener('touchmove', (e) => {
+  if (state.page !== 'flow' || touchY == null) return;
+  e.preventDefault();
+  const dy = touchY - e.touches[0].clientY;
+  touchY = e.touches[0].clientY;
+  onFlowScroll(dy * 3);
+}, { passive: false });
+window.addEventListener('touchend', () => { touchY = null; });
+
+// Reset flow when returning to it from another page
+function resetFlow() {
+  scrollProgress = 0;
+  applyScrollProgress();
+  view.scale = INITIAL_ZOOM;
+}
+
+/* ════════════════════════════════════════════════════════════
+   INDEX PAGE
+   ════════════════════════════════════════════════════════════ */
+function buildIndexRows() {
+  const container = document.getElementById('index-rows');
+  container.innerHTML = '';
+  for (const entry of state.entries) {
+    const row = document.createElement('div');
+    row.className = 'index-row';
+    const treeName = entry.matchedTree?.species || 'tree';
+    const bagAddress = entry.address || '';
+    row.innerHTML = `
+      <div class="col-tree">${escapeHtml(treeName)}</div>
+      <div class="col-latin">${escapeHtml(entry.matchedTree?.latin || '')}</div>
+      <div class="col-addr">${escapeHtml(bagAddress)}</div>
+      <div class="col-date">${formatDate(entry.date)}</div>
+      <div class="col-time">${formatTime(entry.hour)}</div>
+    `;
+    row.addEventListener('click', () => {
+      const bloom = state.blooms.find(b => b.entry.id === entry.id);
+      revealVideoFullscreen(entry, bloom);
+    });
+    container.appendChild(row);
+  }
+  fitIndexColumns();
+}
+// Size each index column to its widest text, so the gap between every pair of columns is identical
+function fitIndexColumns() {
+  const container = document.getElementById('index-rows');
+  if (!container) return;
+  const names = ['col-tree', 'col-latin', 'col-addr', 'col-date', 'col-time'];
+  const widths = names.map(() => 0);
+  const rg = document.createRange();
+  container.querySelectorAll('.index-row').forEach((row) => {
+    names.forEach((n, i) => {
+      const el = row.querySelector('.' + n);
+      if (!el) return;
+      rg.selectNodeContents(el);
+      widths[i] = Math.max(widths[i], rg.getBoundingClientRect().width);
+    });
+  });
+  if (widths.some((w) => w > 0)) {
+    const cols = widths.map((w) => Math.ceil(w) + 2);
+    container.style.setProperty('--ix-cols', cols.map((w) => w + 'px').join(' '));
+    // spread the columns across the full row: the left-over width is shared equally between the four gaps
+    const row = container.querySelector('.index-row');
+    const cs = getComputedStyle(row);
+    const inner = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const gap = (inner - cols.reduce((a, b) => a + b, 0)) / 4;
+    container.style.setProperty('--ix-gap', Math.max(16, gap) + 'px');
+  }
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitIndexColumns());
+window.addEventListener('resize', () => fitIndexColumns());
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ════════════════════════════════════════════════════════════
+   GRID PAGE — randomized cell order each visit
+   ════════════════════════════════════════════════════════════ */
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildGrid() {
+  const container = document.getElementById('grid-cells');
+  container.innerHTML = '';
+  // Sorted newest-first (already sorted in state.entries on init)
+  for (const entry of state.entries) {
+    const cell = document.createElement('div');
+    cell.className = 'grid-cell';
+    const treeName = entry.matchedTree?.species || 'tree';
+    const bagAddress = entry.address || '';
+    cell.innerHTML = `
+      <div class="grid-cell-meta">
+        <div class="gcm-addr">${escapeHtml(bagAddress)}</div>
+        <div class="gcm-date">${formatDate(entry.date)}</div>
+        <div class="gcm-time">${formatTime(entry.hour)}</div>
+      </div>
+      <div class="grid-cell-video-wrap">
+        <div class="gcm-names"><span class="gcm-tree">${escapeHtml(treeName)}</span><span class="gcm-latin">${escapeHtml(entry.matchedTree?.latin || '')}</span></div>
+        ${entry.imageUrl ? `<img src="${entry.imageUrl}" alt="" loading="lazy">` : ''}
+        ${entry.videoUrl ? `<video muted loop playsinline preload="none" data-src="${entry.videoUrl}"></video>` : ''}
+      </div>
+    `;
+    const video = cell.querySelector('video[data-src]');
+    let hoverActive = false;
+    // No preview image (missing on Are.na, or it failed to load)? Use the video's own first frame as the picture.
+    if (entry.videoUrl) {
+      const wrap = cell.querySelector('.grid-cell-video-wrap');
+      const img = wrap.querySelector('img');
+      let posterMade = false;
+      const makePoster = () => {
+        if (posterMade) return; posterMade = true;
+        const pv = document.createElement('video');
+        pv.className = 'poster-frame'; pv.muted = true; pv.playsInline = true; pv.preload = 'metadata';
+        pv.setAttribute('aria-hidden', 'true');
+        wrap.insertBefore(pv, wrap.querySelector('video[data-src]'));
+        const load = () => { pv.src = entry.videoUrl + '#t=0.1'; };
+        if ('IntersectionObserver' in window) {
+          const io = new IntersectionObserver((en) => { if (en[0].isIntersecting) { io.disconnect(); load(); } }, { rootMargin: '600px' });
+          io.observe(wrap);
+        } else load();
+      };
+      if (!img) makePoster();
+      else img.addEventListener('error', () => { img.remove(); makePoster(); });
+    }
+    if (video) {
+      video.addEventListener('playing', () => {
+        if (hoverActive) video.classList.add('ready');
+      });
+    }
+    cell.addEventListener('mouseenter', () => {
+      if (!video) return;
+      hoverActive = true;
+      if (!video.src) {
+        video.src = video.dataset.src;
+        video.load();
+      }
+      const tryPlay = () => { if (hoverActive) video.play().catch(()=>{}); };
+      if (video.readyState >= 2) tryPlay();
+      else video.addEventListener('canplay', tryPlay, { once: true });
+    });
+    cell.addEventListener('mouseleave', () => {
+      if (!video) return;
+      hoverActive = false;
+      video.classList.remove('ready');  // hide video, image shows again — no white gap
+      video.pause();
+    });
+    cell.addEventListener('mouseenter', () => {
+      cursor.classList.add('dragging'); // solid cursor on hover
+      cell.classList.add('is-hovered');
+    });
+    cell.addEventListener('mouseleave', () => {
+      cursor.classList.remove('dragging');
+      cell.classList.remove('is-hovered');
+    });
+    cell.addEventListener('click', () => openGridCellOnMap(cell, entry));
+    container.appendChild(cell);
+  }
+}
+
+
+/* Grid click: straight to the map, no animation — centred on that tree's dot with its video playing from the tile's time. */
+let gridMouse = { x: -1, y: -1 }, gridHoverCell = null, gridScrollRaf = 0;
+window.addEventListener('mousemove', (e) => { gridMouse.x = e.clientX; gridMouse.y = e.clientY; });
+document.getElementById('page-grid').addEventListener('scroll', () => {
+  if (gridScrollRaf || gridMouse.x < 0) return;
+  gridScrollRaf = requestAnimationFrame(() => {
+    gridScrollRaf = 0;
+    const el = document.elementFromPoint(gridMouse.x, gridMouse.y);
+    const cell = el ? el.closest('.grid-cell') : null;
+    if (cell === gridHoverCell) return;
+    if (gridHoverCell) gridHoverCell.dispatchEvent(new MouseEvent('mouseleave'));
+    gridHoverCell = cell;
+    if (cell) cell.dispatchEvent(new MouseEvent('mouseenter'));
+  });
+}, { passive: true });
+function openGridCellOnMap(cell, entry) {
+  const bloom = state.blooms.find(b => b.entry.id === entry.id);
+  const tv = cell.querySelector('video[data-src]');
+  const t = tv && tv.classList.contains('ready') ? tv.currentTime : undefined;
+  if (tv) { tv.classList.remove('ready'); tv.pause(); }
+  videoOrigin = { page: 'grid', scrollTop: document.getElementById('page-grid').scrollTop };
+  document.body.classList.add('instant');
+  goTo('map');
+  if (bloom) {
+    view.x = bloom.wx; view.y = bloom.wy; view.targetX = bloom.wx; view.targetY = bloom.wy;
+    view.scale = 6; view.targetScale = 6;
+    currentHoverBloom = bloom;
+    showVideoFor(bloom, t);
+    bgWrap.classList.add('clickable');
+  }
+  setTimeout(() => document.body.classList.remove('instant'), 250);
+}
+
+/* Index click: reveal the bloom's video straight to fullscreen (0 → 100%),
+   no map glimpse first. A fullscreen video overlay fades + scales in, then
+   hands off to the map's own video underneath. */
+function revealVideoFullscreen(entry, bloom) {
+  videoOrigin = { page: 'index', scrollTop: document.getElementById('page-index').scrollTop };
+  const overlay = document.createElement('div');
+  overlay.id = 'expand-overlay';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.classList.add('settled'); // no edge feather — it's already fullscreen
+
+  if (entry.videoUrl) {
+    const v = document.createElement('video');
+    v.src = entry.videoUrl;
+    v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    overlay.appendChild(v);
+    v.play().catch(()=>{});
+  } else if (entry.imageUrl) {
+    const img = document.createElement('img');
+    img.src = entry.imageUrl;
+    overlay.appendChild(img);
+  }
+
+  // Start slightly scaled down + transparent, then animate to full
+  overlay.style.transform = 'scale(1.06)';
+  document.body.appendChild(overlay);
+  void overlay.offsetWidth;
+  overlay.classList.add('entering');         // opacity 0 → 1
+  requestAnimationFrame(() => {
+    overlay.style.transform = 'scale(1)';     // settle to full
+  });
+
+  // After the reveal, set up the map underneath and cross-fade to it
+  setTimeout(() => {
+    goTo('map');
+    if (bloom) {
+      view.x = bloom.wx; view.y = bloom.wy;
+      view.targetX = bloom.wx; view.targetY = bloom.wy;
+      view.scale = 6; view.targetScale = 6;
+      currentHoverBloom = bloom;
+      showVideoFor(bloom);
+      bgWrap.classList.add('clickable');
+    }
+    setTimeout(() => {
+      overlay.classList.add('gone');
+      setTimeout(() => overlay.remove(), 470);
+    }, 180);
+  }, 620);
+}
+
+function expandCellToFullscreen(cell, entry) {
+  const videoWrap = cell.querySelector('.grid-cell-video-wrap');
+  if (!videoWrap) return;
+  videoOrigin = { page: 'grid', scrollTop: document.getElementById('page-grid').scrollTop };
+  const rect = videoWrap.getBoundingClientRect();
+  const bloom = state.blooms.find(b => b.entry.id === entry.id);
+
+  // Build the overlay clone, sized + positioned exactly over the cell
+  const overlay = document.createElement('div');
+  overlay.id = 'expand-overlay';
+  overlay.style.top = rect.top + 'px';
+  overlay.style.left = rect.left + 'px';
+  overlay.style.width = rect.width + 'px';
+  overlay.style.height = rect.height + 'px';
+
+  // Clone whatever is currently visible (video if playing, else image)
+  const existingVideo = cell.querySelector('video[data-src]');
+  const existingImg = cell.querySelector('img');
+  let cloneVideo = null;
+  if (existingVideo && existingVideo.src && existingVideo.classList.contains('ready')) {
+    const v = document.createElement('video');
+    v.src = existingVideo.src;
+    v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    try { v.currentTime = existingVideo.currentTime; } catch(e){}
+    overlay.appendChild(v);
+    v.play().catch(()=>{});
+    cloneVideo = v;
+  } else if (existingImg) {
+    const img = document.createElement('img');
+    img.src = existingImg.src;
+    overlay.appendChild(img);
+  }
+
+  document.body.appendChild(overlay);
+
+  // Compute the scale needed to grow from the cell size to fully cover the viewport.
+  const scaleX = window.innerWidth / rect.width;
+  const scaleY = window.innerHeight / rect.height;
+  const scale = Math.max(scaleX, scaleY) * 1.05; // slight overscan so no edges show
+  const cellCx = rect.left + rect.width / 2;
+  const cellCy = rect.top + rect.height / 2;
+  const dx = (window.innerWidth / 2) - cellCx;
+  const dy = (window.innerHeight / 2) - cellCy;
+
+  // Fade the overlay in at its starting position/size
+  void overlay.offsetWidth;
+  overlay.classList.add('entering');
+
+  // Grow: scale up + drift to center (fast soft ease). Map is NOT set up yet,
+  // so the only thing visible growing is this single cell.
+  requestAnimationFrame(() => {
+    overlay.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+  });
+
+  // When the growth finishes (~640ms), drop the feathered edge mask for a crisp
+  // full frame, THEN set up the map underneath and cross-fade to it.
+  setTimeout(() => {
+    overlay.classList.add('settled');
+    // Now prepare the map underneath (hidden behind the now-fullscreen overlay)
+    goTo('map');
+    if (bloom) {
+      view.x = bloom.wx; view.y = bloom.wy;
+      view.targetX = bloom.wx; view.targetY = bloom.wy;
+      view.scale = 6; view.targetScale = 6;
+      currentHoverBloom = bloom;
+      const syncTime = cloneVideo ? cloneVideo.currentTime : undefined;
+      showVideoFor(bloom, syncTime);
+      bgWrap.classList.add('clickable');
+    }
+    // Only fade the overlay out once the map's video is genuinely painting —
+    // this removes the 1-frame white/empty gap during the handoff.
+    let faded = false;
+    const fadeOut = () => {
+      if (faded) return;
+      faded = true;
+      overlay.classList.add('gone');
+      setTimeout(() => overlay.remove(), 470);
+    };
+    if (bloom && bgVideo) {
+      bgVideo.addEventListener('playing', () => setTimeout(fadeOut, 60), { once: true });
+      setTimeout(fadeOut, 700); // fallback if the event never fires
+    } else {
+      setTimeout(fadeOut, 180);
+    }
+  }, 640);
+}
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════ */
+function snapBloomsToTrees() {
+  let snapped = 0, borrowed = 0, farBorrowed = 0;
+  for (const b of state.blooms) {
+    if (b.fanned) {
+      const any = findNearestTreeAnyDistance(b.lat, b.lon);
+      if (any) { b.matchedTree = any; b.entry.matchedTree = any; if (any.species) state.bloomSpecies.add(any.species); farBorrowed++; }
+      continue;
+    }
+    const close = findNearestTree(b.lat, b.lon, 12);
+    if (close) {
+      b.matchedTree = close;
+      b.lat = close.lat; b.lon = close.lon;
+      const p = project(b.lat, b.lon); b.wx = p.x; b.wy = p.y;
+      b.entry.matchedTree = close;
+      if (close.species) state.bloomSpecies.add(close.species);
+      snapped++; continue;
+    }
+    const nearby = findNearestTree(b.lat, b.lon, 25);
+    if (nearby) { b.matchedTree = nearby; b.entry.matchedTree = nearby; if (nearby.species) state.bloomSpecies.add(nearby.species); borrowed++; continue; }
+    const any = findNearestTreeAnyDistance(b.lat, b.lon);
+    if (any) { b.matchedTree = any; b.entry.matchedTree = any; if (any.species) state.bloomSpecies.add(any.species); farBorrowed++; }
+  }
+  console.log(`Blooms: ${snapped} snapped, ${borrowed} close-borrowed, ${farBorrowed} far-borrowed of ${state.blooms.length}`);
+}
+
+// The homepage number counts up while Are.na is still loading, then runs on to the real total.
+let countLoadTimer = null;
+function startCountLoading(el) {
+  if (!el) return;
+  let n = 0;
+  countLoadTimer = setInterval(() => { if (n < 40) { n++; el.textContent = n; } }, 70);
+}
+function animateCount(el, target) {
+  if (!el) return;
+  if (countLoadTimer) { clearInterval(countLoadTimer); countLoadTimer = null; }
+  const from = parseInt(el.textContent, 10) || 0;
+  const duration = 1700;
+  const t0 = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out
+    el.textContent = Math.round(from + (target - from) * eased);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = target;
+  }
+  requestAnimationFrame(tick);
+}
+
+// Align the loader title vertically with the homepage title (horizontal centering
+// is handled by CSS). Only sets `top` so there's no movement on load.
+function positionLoaderTitle() {
+  const loaderTitle = document.querySelector('#loading-screen .loading-title');
+  const homeTitle = document.querySelector('.stage-home .big-title');
+  if (!loaderTitle || !homeTitle) return;
+  const target = homeTitle.getBoundingClientRect();
+  loaderTitle.style.top = target.top + 'px';
+  loaderTitle.style.left = target.left + 'px';
+  // start centred on the page (as a transform offset from its final spot), then glide left once loaded
+  const w = loaderTitle.getBoundingClientRect().width;
+  loaderTitle.style.setProperty('--title-offset', Math.round((innerWidth - w) / 2 - target.left) + 'px');
+}
+
+// The homepage number counts up only once the loading page is gone and the site is actually in view
+let homeCountStarted = false;
+function startHomeCount() {
+  if (homeCountStarted) return;
+  homeCountStarted = true;
+  animateCount(document.getElementById('home-count'), state.entries.length);
+}
+
+function dismissLoading() {
+  const ls = document.getElementById('loading-screen');
+  if (!ls) { startHomeCount(); return; }
+  if (ls.classList.contains('gone')) return;
+  const loaderTitle = ls.querySelector('.loading-title');
+  const homeTitle = document.querySelector('.stage-home .big-title');
+
+  // Enable the transition first (via .settling), then move — so the slide animates.
+  ls.classList.add('settling');
+  void ls.offsetWidth; // force reflow so the transition is armed
+
+  if (loaderTitle && homeTitle) {
+    // Slide horizontally only — vertical is already aligned to the homepage title.
+    const target = homeTitle.getBoundingClientRect();
+    loaderTitle.style.top = target.top + 'px';   // keep vertical aligned
+    loaderTitle.style.setProperty('--title-offset', '0px');
+  }
+
+  setTimeout(() => {
+    ls.classList.add('gone');
+    setTimeout(startHomeCount, 350);      // the count starts as the page fades into view
+    setTimeout(() => ls.remove(), 900);
+  }, 1800);
+}
+
+async function init() {
+  const arenaPromise = fetchArena();
+  const treesPromise = tryLoadBinaryTrees();   // start both downloads together
+  loop();
+
+  // Align the loader title vertically with the homepage title (centered horizontally)
+  alignTitleInk(); positionLoaderTitle();
+  window.addEventListener('resize', () => {
+    const ls = document.getElementById('loading-screen');
+    if (ls && !ls.classList.contains('settling') && !ls.classList.contains('gone')) {
+      positionLoaderTitle();
+    }
+  });
+
+  state.entries = await arenaPromise;
+  state.entries.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+
+  state.blooms = state.entries.map((entry, i) => new Bloom(entry, i));
+  spreadOverlappingBlooms(state.blooms, 20);
+
+  buildIndexRows();
+  buildGrid();
+
+  // ── FAST PATH: pre-baked binary ────────────────────────────
+  const gotBinary = await treesPromise;
+  if (gotBinary) {
+    buildTreeIndex();
+    snapBloomsToTrees();
+    rebuildGridByWorldPos();
+    state.introReady = true;
+    buildIndexRows();
+    buildGrid();
+    await Promise.race([loadTreeAddresses(), sleep(8000)]).catch(() => {});   // street addresses too, before the site opens
+    buildIndexRows();
+    buildGrid();
+    await assetsReady();
+    dismissLoading();
+    return;
+  }
+
+  // ── FALLBACK: live API, progressive load + relaxation ──────
+  console.log('[trees] No binary found — falling back to live NYC API');
+  const nextOffset = await loadInitialTrees(4);
+  snapBloomsToTrees();
+  await relaxTreePositions();
+  for (const b of state.blooms) {
+    if (b.matchedTree) { b.wx = b.matchedTree.wx; b.wy = b.matchedTree.wy; }
+  }
+  rebuildGridByWorldPos();
+  state.introReady = true;
+  buildIndexRows();
+  buildGrid();
+
+  // Stay on the loading page until the whole city (every dot) and the other assets are in, so the site opens fully ready
+  await loadRemainingTrees(nextOffset);
+  console.log('[trees] Full city load complete:', state.allTrees.length);
+  snapBloomsToTrees();      // re-snap now that every tree is present (better matches)
+  buildIndexRows();
+  buildGrid();
+  await assetsReady();
+  dismissLoading();
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Fonts and every image on the page (grid thumbnails etc.), capped at 8 s so a slow asset can never trap the visitor
+function assetsReady() {
+  const imgs = [...document.querySelectorAll('img')].filter((i) => !i.complete)
+    .map((i) => new Promise((r) => { i.addEventListener('load', r, { once: true }); i.addEventListener('error', r, { once: true }); }));
+  const fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+  return Promise.race([Promise.all([fonts, ...imgs]), sleep(8000)]);
+}
+
+
+/* Nudge the big homepage title so the ink of its first letter (not its text box) lines up with the "+" */
+function alignTitleInk() {
+  const t = document.querySelector('.stage-home .big-title');
+  if (!t) return;
+  try {
+    const cs = getComputedStyle(t);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const m = c.measureText((t.textContent || 'B').trim().charAt(0));
+    const bearing = -m.actualBoundingBoxLeft;            // gap between the text box edge and the first letter's ink
+    t.style.marginLeft = (-bearing).toFixed(2) + 'px';
+  } catch (e) {}
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { alignTitleInk(); try { positionLoaderTitle(); } catch (e) {} }); else window.addEventListener('load', alignTitleInk);
+window.addEventListener('resize', () => { alignTitleInk(); });
+
+/* First visit only: ask where the visitor is; if inside NYC, the map opens around them (needs https, not file://) */
+function askLocationOnce() {
+  try {
+    if (!navigator.geolocation || localStorage.getItem('bot-geo-asked')) return;
+    localStorage.setItem('bot-geo-asked', '1');
+  } catch (e) { return; }
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const { latitude: lat, longitude: lon } = pos.coords;
+    if (lat < 40.49 || lat > 40.92 || lon < -74.27 || lon > -73.68) return;   // outside NYC
+    const p = project(lat, lon);
+    view.targetX = p.x; view.targetY = p.y;
+  }, () => {}, { timeout: 8000, maximumAge: 600000 });
+}
+window.addEventListener('load', () => setTimeout(askLocationOnce, 1500));
+
+init();
+
+// "+" upload buttons: highlight light-blue when chosen (before/while Are.na opens),
+// revert when the user comes back to this tab.
+document.querySelectorAll('.plus').forEach(p => {
+  p.addEventListener('click', () => {
+    document.querySelectorAll('.plus').forEach(x => x.classList.add('chosen'));
+  });
+});
+window.addEventListener('focus', () => {
+  document.querySelectorAll('.plus').forEach(x => x.classList.remove('chosen'));
+});
+
+// "+" hover tooltip
+const plusTooltip = document.getElementById('plus-tooltip');
+document.querySelectorAll('.plus').forEach(p => {
+  p.addEventListener('mouseenter', () => {
+    if (state.page === 'grid') return;
+    const r = p.getBoundingClientRect();
+    plusTooltip.style.left = r.left + 'px';
+    plusTooltip.style.top = (r.bottom + 12) + 'px';
+    plusTooltip.classList.add('visible');
+  });
+  p.addEventListener('mouseleave', () => {
+    plusTooltip.classList.remove('visible');
+  });
+});
+</script>
+
+<!-- WIND FLAG -->
+<div id="flag" class="off" aria-hidden="true"><canvas id="flag-canvas"></canvas></div>
+<script>
+
+(function () {
+  "use strict";
+  var TAU = Math.PI * 2;
+
+  /* ---- helpers ---- */
+  function h(x, y, z) {
+    var n = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177)) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    n ^= n >>> 16;
+    return (n >>> 0) / 4294967296;
+  }
+  function fade(t) { return t * t * (3 - 2 * t); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+  function sstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+  function noise3(x, y, z) {
+    var xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    var xf = fade(x - xi), yf = fade(y - yi), zf = fade(z - zi);
+    var a = lerp(lerp(h(xi, yi, zi), h(xi + 1, yi, zi), xf), lerp(h(xi, yi + 1, zi), h(xi + 1, yi + 1, zi), xf), yf);
+    var b = lerp(lerp(h(xi, yi, zi + 1), h(xi + 1, yi, zi + 1), xf), lerp(h(xi, yi + 1, zi + 1), h(xi + 1, yi + 1, zi + 1), xf), yf);
+    return lerp(a, b, zf) * 2 - 1;
+  }
+
+  /* ---- Perlin height tile, generated once: its slope tilts the surface normal so the cloth has a fine pebbled feel under the lights ---- */
+  function pg(ix, iy, dx, dy, p) {
+    ix = ((ix % p) + p) % p; iy = ((iy % p) + p) % p;
+    var a = h(ix, iy, 13) * TAU;
+    return Math.cos(a) * dx + Math.sin(a) * dy;
+  }
+  function perlin(x, y, p) { // gradient noise, about -1..1, repeats every p cells
+    var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = fade(xf), v = fade(yf);
+    return 1.41 * lerp(lerp(pg(xi, yi, xf, yf, p), pg(xi + 1, yi, xf - 1, yf, p), u),
+                       lerp(pg(xi, yi + 1, xf, yf - 1, p), pg(xi + 1, yi + 1, xf - 1, yf - 1, p), u), v);
+  }
+  var TS = 256, TN = TS * TS;
+  var th = new Float32Array(TN), hu = new Float32Array(TN), hv = new Float32Array(TN);
+  (function () {
+    var x, y, o, fr, f, a, tot, k;
+    for (y = 0; y < TS; y++) for (x = 0; x < TS; x++) {
+      f = 0; a = 0.5; tot = 0;
+      for (o = 0; o < 5; o++) { fr = 4 << o; f += a * perlin(x / TS * fr, y / TS * fr, fr); tot += a; a *= 0.5; }
+      th[y * TS + x] = clamp(0.5 + 0.7 * (f / tot) + (h(x, y, 11) - 0.5) * 0.08, 0, 1);
+    }
+    for (y = 0; y < TS; y++) for (x = 0; x < TS; x++) {
+      k = y * TS + x;
+      hu[k] = (th[y * TS + ((x + 1) & 255)] - th[y * TS + ((x + 255) & 255)]) * 0.5;
+      hv[k] = (th[((y + 1) & 255) * TS + x] - th[((y + 255) & 255) * TS + x]) * 0.5;
+    }
+  })();
+
+  /* ---- film grain: two white-noise tiles (fine and coarse) that are re-dealt 10 times a second ---- */
+  var G1 = new Uint8Array(65536), G2 = new Uint8Array(65536), gk;
+  for (gk = 0; gk < 65536; gk++) { G1[gk] = h(gk & 255, gk >> 8, 21) * 255; G2[gk] = h(gk & 255, gk >> 8, 22) * 255; }
+
+  /* ---- tone ramp: one lookup from shading (0 dark .. 1 lit) to colour.
+         Mid tone is the light blue from the reference; shadows slide to a saturated violet-blue, highlights to pale ice. ---- */
+  var STOPS = [[0.00, 150, 126, 112], [0.16, 190, 156, 136], [0.27, 226, 190, 170], [0.38, 183, 206, 255], [0.72, 190, 212, 255], [0.88, 208, 224, 255], [1.00, 232, 240, 255]];   // site light blue, with the dots' warm tans (#E1C2AE/#D9A884/#AD9482) in the lights and shadows
+  /* Accents, at most about a quarter of any colour: warm sunlight on the lit side, leaf sage in the light shade, bark brown in the deepest shade.
+     The second index of the table is an accent amount from -1 (sage / bark) to +1 (sun). */
+  var NA = 17, LUT = new Uint32Array(NA * 1024);
+  function buildLUT() {
+    var k, s, e, f, r, g, b, ai, ac, m, lum, ar, ag, ab, sw;
+    for (k = 0; k < 1024; k++) {
+      s = k / 1023;
+      for (e = 1; e < STOPS.length - 1 && s > STOPS[e][0]; e++);
+      f = clamp((s - STOPS[e - 1][0]) / (STOPS[e][0] - STOPS[e - 1][0]), 0, 1);
+      r = lerp(STOPS[e - 1][1], STOPS[e][1], f); g = lerp(STOPS[e - 1][2], STOPS[e][2], f); b = lerp(STOPS[e - 1][3], STOPS[e][3], f);
+      lum = 0.3 * r + 0.59 * g + 0.11 * b;
+      for (ai = 0; ai < NA; ai++) {
+        ac = (ai - 8) / 8;
+        if (ac >= 0) { ar = lum * 1.16; ag = lum * 0.98; ab = lum * 0.78; }
+        else { sw = sstep(0.15, 0.5, s); ar = lum * lerp(1.14, 0.86, sw); ag = lum * lerp(0.94, 1.05, sw); ab = lum * lerp(0.94, 0.9, sw); }
+        m = 0;   // no sun / leaf / bark tints: only the site blue, white and grey
+        LUT[ai * 1024 + k] = 0xff000000 | ((clamp(lerp(b, ab, m), 0, 255) | 0) << 16) | ((clamp(lerp(g, ag, m), 0, 255) | 0) << 8) | (clamp(lerp(r, ar, m), 0, 255) | 0);
+      }
+    }
+  }
+  buildLUT();
+  window.__flagPalette = function (stops) { STOPS = stops; buildLUT(); };   // the page picks a new colour mix on every hover
+
+  /* ---- one open sheet of thin film (a single layer, not a closed bag), in four base outlines:
+         a teardrop, a long ribbon, a wide fan and a lopsided shard. All four hang from one tiny pin point at the origin. ---- */
+  var NU = 18, NV = 44, N = (NU + 1) * (NV + 1), K = 4;
+  var SHsx = new Float32Array(K * N), SHsy = new Float32Array(K * N), SHnx = new Float32Array(K * N), SHny = new Float32Array(K * N);
+  var SHox = new Float32Array(K * N), SHoy = new Float32Array(K * N), SHoz = new Float32Array(K * N);   // per shape: spine point, spine side direction, offset from the spine
+  var UQ = new Float32Array(N), VQ = new Float32Array(N), WQT = new Float32Array(N), HEM = new Float32Array(N);   // across, along, wind weight, hem
+  var UU = new Float32Array(N), VV = new Float32Array(N), HF = new Float32Array(N);   // HF: > 0 inside a hole
+  var GA = new Float32Array(N), GB = new Float32Array(N);   // where each point sits on the film itself (across, along), so the grain can ride on it
+  var SPN = [[0.5, -0.5, 1.1, -1.7, 1.3, -3.1], [0.2, -1.1, 1.0, -2.4, 0.5, -3.9], [0.7, -0.2, 1.0, -0.9, 0.8, -1.9], [0.8, 0.3, 1.8, -0.2, 2.1, -1.9]];
+  var CUP = [0.18, 0.08, 0.3, 0.12];
+  function hwid(k, v) {                       // half width of the sheet at v (0 = the pin, 1 = the far end)
+    if (k === 0) return 0.03 + 0.62 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(v, 0.7))), 0.75);
+    if (k === 1) return 0.03 + 0.2 * sstep(0, 0.3, v) * (1 + 0.18 * Math.sin(9 * v + 1)) * (1 - 0.45 * sstep(0.85, 1, v));
+    if (k === 2) return 0.03 + 0.95 * Math.pow(sstep(0, 0.55, v), 0.8) * (0.86 + 0.14 * Math.cos(15 * v));
+    return (0.03 + 0.55 * (v < 0.6 ? Math.pow(v / 0.6, 0.9) : Math.pow(Math.max(0, 1 - (v - 0.6) / 0.4), 0.8))) * (1 + 0.1 * Math.sin(23 * v));
+  }
+  function cskew(k, v) { return k === 3 ? 0.35 * Math.sin(Math.PI * v) : k === 1 ? 0.1 * Math.sin(5 * v) : k === 0 ? 0.08 * Math.sin(3 * v) : 0; }
+  var i, j, n, k;
+  for (k = 0; k < K; k++) {
+    var Q = SPN[k];
+    for (j = 0; j <= NV; j++) {
+      var v = j / NV;
+      for (i = 0; i <= NU; i++) {
+        n = j * (NU + 1) + i;
+        var uu = -1 + 2 * i / NU, idx = k * N + n;
+        /* the far end is not cut straight: it is rounded off and ragged, differently in each shape */
+        var ec = sstep(0.55, 1, v) * (0.14 * uu * uu + 0.08 * (0.5 + 0.5 * Math.sin(3.1 * uu + 1.7 * k + 0.6)) + 0.03 * Math.sin(5 * uu + 2.3 * k) + 0.04 * uu);
+        var vs = v * (1 - ec), u1 = 1 - vs;
+        var bx = 3 * u1 * u1 * vs * Q[0] + 3 * u1 * vs * vs * Q[2] + vs * vs * vs * Q[4];
+        var by = 3 * u1 * u1 * vs * Q[1] + 3 * u1 * vs * vs * Q[3] + vs * vs * vs * Q[5];
+        var tx = 3 * u1 * u1 * Q[0] + 6 * u1 * vs * (Q[2] - Q[0]) + 3 * vs * vs * (Q[4] - Q[2]);
+        var ty = 3 * u1 * u1 * Q[1] + 6 * u1 * vs * (Q[3] - Q[1]) + 3 * vs * vs * (Q[5] - Q[3]);
+        var tl = Math.sqrt(tx * tx + ty * ty) || 1, nx0 = -ty / tl, ny0 = tx / tl;
+        var hwv = hwid(k, vs), cs = cskew(k, vs);
+        var ofu = uu * hwv * (1 + 0.1 * ec / 0.2) + cs;
+        SHsx[idx] = bx; SHsy[idx] = by; SHnx[idx] = nx0; SHny[idx] = ny0;
+        SHox[idx] = ofu * nx0; SHoy[idx] = ofu * ny0;
+        SHoz[idx] = CUP[k] * (1 - uu * uu) * sstep(0, 0.3, v) + 0.14 * noise3(bx * 1.1 + k * 3.7, by * 1.1, uu * 1.3 + k) * sstep(0, 0.25, v);
+        if (k === 0) {
+          UQ[n] = uu; VQ[n] = v;
+          WQT[n] = Math.pow(clamp(v * 1.15, 0, 1), 1.1);
+          HEM[n] = Math.max(Math.pow(Math.abs(uu), 8), Math.pow(v, 36));
+          UU[n] = (uu + 1) * 0.6; VV[n] = v * 2.6;
+        }
+      }
+    }
+  }
+  var HWR = new Float32Array(K * (NV + 1)), RWT = new Float32Array(NV + 1);   // how wide each shape is along its length (to measure what share is hole)
+  for (k = 0; k < K; k++) for (j = 0; j <= NV; j++) HWR[k * (NV + 1) + j] = hwid(k, j / NV);
+  var PX = 0, PY = 0, PZ = 0;                 // the pin
+  /* how the four shapes mix: each has its own pair of very slow, unrelated rhythms (tens of seconds), so the mix never repeats */
+  var SR1 = [0.11, 0.083, 0.137, 0.097], SR2 = [0.071, 0.123, 0.059, 0.151], WP = [0.0, 0.31, 0.67, 0.12], WQ = [0.44, 0.9, 0.2, 0.73], WK = new Float32Array(K);
+  /* slow holes: three spots on the sheet that each open small, widen, then close again on their own rhythm */
+  var HR = [0.1, 0.065, 0.085], HW = [0.047, 0.061, 0.039], HP = [0.4, 2.3, 4.1], HA = [1.5, 0.75, 1.25], HU0 = [0.15, -0.3, 0.35], HV0 = [0.55, 0.74, 0.42], HX = new Float32Array(3), HY = new Float32Array(3), HRD = new Float32Array(3);
+
+  var triList = [];
+  for (j = 0; j < NV; j++) for (i = 0; i < NU; i++) {
+    var a = j * (NU + 1) + i, b = a + 1, c = a + NU + 1, d = c + 1;
+    triList.push(a, b, c, b, d, c);
+  }
+  var T = triList.length / 3, tris = new Uint16Array(triList);
+
+  /* ---- working arrays ---- */
+  var X = new Float32Array(N), Y = new Float32Array(N), Z = new Float32Array(N);
+  var NX = new Float32Array(N), NY = new Float32Array(N), NZ = new Float32Array(N);
+  var SX = new Float32Array(N), SY = new Float32Array(N), MX = new Float32Array(N), MY = new Float32Array(N);
+  var tgx = new Float32Array(N), tgy = new Float32Array(N), tgz = new Float32Array(N);   // surface direction along the noise's u
+  var bnx = new Float32Array(N), bny = new Float32Array(N), bnz = new Float32Array(N);   // and along its v
+  var BS = 1.0;                                                                         // fine pebbling that catches the light
+
+  /* ---- three bulbs, in view space: a bright warm key at upper left, a weaker fill on the right, a faint bounce from below ---- */
+  var LX = new Float32Array([-3.0, 5.8, 0.8]), LY = new Float32Array([3.4, 0.5, -5.5]), LZ = new Float32Array([7.5, 7.0, 5.0]);
+  var LI = new Float32Array([1.3, 0.24, 0.2]);
+  var ZW = -1.2;                                                                        // the wall sits this far behind the pin
+
+  /* ---- canvas ---- */
+  var canvas = document.getElementById("flag-canvas");
+  var ctx = canvas.getContext("2d");
+  var rc = document.createElement("canvas"), rctx = rc.getContext("2d");
+  var W = 0, H = 0, dpr = 1, rs = 1, RW = 0, RH = 0, SW = 0, SH = 0, img = null, buf = null, zb = null, GNb = null, dirty = true;
+  var M1 = null, M2 = null, MT = null, ST = null, AC = null, SN = null, AN = null, ACN = null, SFa = null, ZF = null;
+  var ox = 0, oy = 0, Sr = 1;
+
+  function resize() {
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    if (!W || !H) return;
+    dpr = (W * H > 1500000) ? 1 : Math.min(2, window.devicePixelRatio || 1);   // the picture is rendered at low res anyway; a huge flag doesn't need a huge backing store
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    rs = Math.min(0.85, Math.sqrt(1500000 / (W * H)));
+    RW = Math.max(8, Math.round(W * rs)); RH = Math.max(8, Math.round(H * rs));
+    rc.width = RW; rc.height = RH;
+    img = rctx.createImageData(RW, RH);
+    buf = new Uint32Array(img.data.buffer);
+    GNb = new Float32Array(RW * RH); zb = new Float32Array(RW * RH); ZF = new Float32Array(RW * RH); SN = new Float32Array(RW * RH); AN = new Float32Array(RW * RH); ACN = new Float32Array(RW * RH); SFa = new Float32Array(RW * RH);
+    SW = (RW >> 2) + 2; SH = (RH >> 2) + 2;
+    M1 = new Float32Array(SW * SH); M2 = new Float32Array(SW * SH); MT = new Float32Array(SW * SH); ST = new Float32Array(SW * SH); AC = new Float32Array(SW * SH);
+    dirty = true;
+  }
+
+  /* ---- soft shadows: project the cloth from a bulb onto the wall, then blur ---- */
+  function blur(m, tmp, w, hgt, r) {
+    var inv = 1 / (2 * r + 1), x, y, row, sum, k;
+    for (y = 0; y < hgt; y++) {
+      row = y * w; sum = 0;
+      for (k = -r; k <= r; k++) sum += m[row + clamp(k, 0, w - 1)];
+      for (x = 0; x < w; x++) { tmp[row + x] = sum * inv; sum += m[row + Math.min(w - 1, x + r + 1)] - m[row + Math.max(0, x - r)]; }
+    }
+    for (x = 0; x < w; x++) {
+      sum = 0;
+      for (k = -r; k <= r; k++) sum += tmp[clamp(k, 0, hgt - 1) * w + x];
+      for (y = 0; y < hgt; y++) { m[y * w + x] = sum * inv; sum += tmp[Math.min(hgt - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x]; }
+    }
+  }
+  function castShadow(mask, lx, ly, lz, rad) {
+    var q, t, wx, wy, f, a, b, c, x0, y0, x1, y1, x2, y2, area, inv, minx, maxx, miny, maxy, xx, yy, w0, w1, w2, px, py;
+    var pfw = 16 / (16 - ZW);
+    mask.fill(0);
+    for (q = 0; q < N; q++) {
+      t = (ZW - lz) / (Z[q] - lz);
+      wx = lx + (X[q] - lx) * t; wy = ly + (Y[q] - ly) * t;
+      MX[q] = (ox + (wx - 0.9) * Sr * pfw) * 0.25; MY[q] = (oy - (wy + 1.7) * Sr * pfw) * 0.25;
+    }
+    for (f = 0; f < T; f++) {
+      a = tris[f * 3]; b = tris[f * 3 + 1]; c = tris[f * 3 + 2];
+      if (HF[a] > 0 && HF[b] > 0 && HF[c] > 0) continue;
+      x0 = MX[a]; y0 = MY[a]; x1 = MX[b]; y1 = MY[b]; x2 = MX[c]; y2 = MY[c];
+      area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+      if (area > -1e-6 && area < 1e-6) continue;
+      inv = 1 / area;
+      minx = Math.max(0, Math.floor(Math.min(x0, x1, x2))); maxx = Math.min(SW - 1, Math.ceil(Math.max(x0, x1, x2)));
+      miny = Math.max(0, Math.floor(Math.min(y0, y1, y2))); maxy = Math.min(SH - 1, Math.ceil(Math.max(y0, y1, y2)));
+      for (yy = miny; yy <= maxy; yy++) {
+        py = yy + 0.5;
+        for (xx = minx; xx <= maxx; xx++) {
+          px = xx + 0.5;
+          w0 = ((x1 - px) * (y2 - py) - (x2 - px) * (y1 - py)) * inv;
+          w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2 - py)) * inv;
+          if (w0 >= 0 && w1 >= 0 && w0 + w1 <= 1) mask[yy * SW + xx] = 1;
+        }
+      }
+    }
+    blur(mask, MT, SW, SH, rad); blur(mask, MT, SW, SH, rad);
+  }
+
+  var yaw = 0;
+  function draw(tt, p, A, GR) {   // tt: seconds alive (never loops); p: wind phase
+    var c1 = Math.cos(p), s1 = Math.sin(p), c2 = Math.cos(2 * p), s2 = Math.sin(2 * p), c3 = Math.cos(3 * p), s3 = Math.sin(3 * p);
+    var q, w, th1, v, s, fold, n1, n2, n3, n4, swell, radU, radW, phi, cph, sph, u0, w0z, uq, wq, ln, wdx, wdy;
+
+    /* shape and wind. The film is one open sheet. The four base outlines are blended with weights that drift on their own cycles,
+       so the shape wanders between them unpredictably yet repeats with the loop. The pin never moves; the farther from it,
+       the more the sheet is pushed around, twisted and drawn in. */
+    var e, esum = 0, kk, idx, wk_, qsx, qsy, qnx, qny, qox, qoy, qoz, u0s, side, rpx, rpy, rpz, zw, uq2, lo, hf, hd, mm, ex, ey;
+    for (kk = 0; kk < K; kk++) { e = Math.sin(SR1[kk] * tt + TAU * WP[kk]) + 0.7 * Math.sin(SR2[kk] * tt + TAU * WQ[kk]); e = Math.exp(2.6 * e); WK[kk] = e; esum += e; }
+    for (kk = 0; kk < K; kk++) WK[kk] /= esum;
+    /* growth: the creature slowly gets longer and shorter, wider and narrower */
+    var gl = (0.92 + 0.14 * Math.sin(0.043 * tt + 1) + 0.07 * Math.sin(0.109 * tt + 2)) * (1 + 0.1 * Math.sin(0.061 * tt + 3));
+    var gw = (0.92 + 0.14 * Math.sin(0.037 * tt + 2.2) + 0.07 * Math.sin(0.101 * tt)) * (1 + 0.15 * Math.sin(0.079 * tt));
+    /* new parts: two lobes that sprout from the edges, swell, and are slowly absorbed again */
+    var LB0 = 0.75 * sstep(0, 0.9, 1.3 * Math.sin(0.052 * tt + 0.7) - 0.1), LV0 = 0.42 + 0.4 * (0.5 + 0.5 * Math.sin(0.029 * tt + 1));
+    var LB1 = 0.75 * sstep(0, 0.9, 1.3 * Math.sin(0.067 * tt + 3.4) - 0.1), LV1 = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(0.023 * tt + 4));
+    for (mm = 0; mm < 3; mm++) {
+      HRD[mm] = HR[mm] * Math.pow(sstep(0.35, 0.8, 0.5 + 0.5 * Math.sin(HW[mm] * tt + HP[mm])), 0.8) * sstep(3, 8, tt);   // no holes in the first seconds
+      HX[mm] = HU0[mm] + 0.25 * Math.sin(0.021 * (mm + 1) * tt + mm); HY[mm] = HV0[mm] + 0.04 * Math.sin(0.03 * tt + mm);
+    }
+    /* holes: measured against the sheet so they never take more than 30% of it (up to 38% when several are open) */
+    for (j = 0; j <= NV; j++) { RWT[j] = 0; for (kk = 0; kk < K; kk++) RWT[j] += WK[kk] * HWR[kk * (NV + 1) + j]; }
+    var nopen = 0, hs = 1, it, hfr, htot, hq;
+    for (mm = 0; mm < 3; mm++) if (HRD[mm] > 0.004) nopen++;
+    var hcap = 0.3 + 0.04 * (nopen > 1 ? nopen - 1 : 0);
+    for (it = 0; it < 3; it++) {
+      hfr = 0; htot = 0;
+      for (q = 0; q < N; q++) {
+        v = VQ[q]; uq2 = UQ[q]; hf = -1;
+        for (mm = 0; mm < 3; mm++) if (HRD[mm] > 0) {
+          ex = (uq2 - HX[mm]) * 0.2 * HA[mm]; ey = (v - HY[mm]) / HA[mm];
+          hd = Math.sqrt(ex * ex + ey * ey);
+          if (hd < HRD[mm] * hs * 2) {            // the rim is lumpy, never a circle: a few uneven bulges that slowly shift
+            th1 = Math.atan2(ey, ex);
+            hd /= 1 + 0.3 * Math.sin(2 * th1 + HP[mm] + 0.07 * tt) + 0.22 * Math.sin(3 * th1 + 2 * HP[mm] + 0.05 * tt) + 0.13 * Math.sin(5 * th1 + 3 * HP[mm] - 0.04 * tt);
+          }
+          if (HRD[mm] * hs - hd > hf) hf = HRD[mm] * hs - hd;
+        }
+        HF[q] = hf; hq = RWT[(q / (NU + 1)) | 0]; htot += hq; if (hf > 0) hfr += hq;
+      }
+      if (hfr <= hcap * htot) break;
+      hs *= 0.96 * Math.sqrt(hcap * htot / hfr);
+    }
+    for (q = 0; q < N; q++) {
+      qsx = 0; qsy = 0; qnx = 0; qny = 0; qox = 0; qoy = 0; qoz = 0;
+      for (kk = 0; kk < K; kk++) {
+        wk_ = WK[kk]; idx = kk * N + q;
+        qsx += wk_ * SHsx[idx]; qsy += wk_ * SHsy[idx]; qnx += wk_ * SHnx[idx]; qny += wk_ * SHny[idx];
+        qox += wk_ * SHox[idx]; qoy += wk_ * SHoy[idx]; qoz += wk_ * SHoz[idx];
+      }
+      qsx *= gl; qsy *= gl; qox *= gw; qoy *= gw; qoz *= gw;
+      v = VQ[q]; uq2 = UQ[q]; w = WQT[q];
+      rpx = qsx + qox; rpy = qsy + qoy; rpz = qoz;
+      n1 = noise3(rpx * 0.8 + 1.7 * c1, rpy * 0.8 + 1.7 * s1, rpz * 0.8 + 2 + 0.05 * tt);
+      n2 = noise3(rpx * 1.7 + 1.3 * c2 + 4, rpy * 1.7 + 1.3 * s2, rpz * 1.7 + 9 + 0.04 * tt);
+      n4 = noise3(rpx * 0.9 + 1.5 * c2 + 11, rpy * 0.9 + 1.5 * s1, rpz * 0.9 + 31 + 0.035 * tt);
+      u0s = qox * qnx + qoy * qny;                                   // offset across the sheet
+      GA[q] = u0s; GB[q] = Math.sqrt(qsx * qsx + qsy * qsy);
+      lo = LB0 * Math.exp(-(v - LV0) * (v - LV0) * 150) * (uq2 > 0 ? uq2 : 0) - LB1 * Math.exp(-(v - LV1) * (v - LV1) * 150) * (uq2 < 0 ? -uq2 : 0);
+      phi = A * w * 1.1 * Math.sin(p - 2.6 * v + 0.4);               // the sheet twists along its length
+      cph = Math.cos(phi); sph = Math.sin(phi);
+      swell = 1 - A * w * 0.2 * (0.5 + 0.5 * Math.sin(2 * p - 4 * v + 0.8));   // and draws in where it ripples
+      side = (u0s + lo) * cph * swell + A * w * (0.3 * Math.sin(p - 3.4 * v) + 0.1 * Math.sin(2 * p - 5.5 * v + 0.9) + 0.3 * n1);
+      zw = A * w * (0.5 * Math.sin(p - 2.6 * v + 1.3 * uq2) + 0.26 * Math.sin(2 * p - 5.2 * v - 1.7 * uq2 + 0.7) + 0.12 * Math.sin(3 * p - 9 * v + 3.1 * uq2 + 2) + 0.5 * n4 + 0.22 * n2)
+         + A * w * w * Math.abs(uq2) * (0.28 * Math.sin(3 * p - 9 * v + 4 * uq2) + 0.12 * Math.sin(2 * p - 13 * v - 3 * uq2));
+      wdx = A * w * (0.4 + 0.25 * Math.sin(p - 1.6 * v) + 0.1 * Math.sin(2 * p - 3 * v + 0.7) + 0.28 * Math.sin(p + 4 * v) + 0.1 * Math.sin(2 * p - 3 * v));
+      wdy = A * w * (0.12 * Math.sin(2 * p - 2.5 * v) + 0.2 * Math.sin(2 * p + 3 * v + 0.5));
+      X[q] = qsx + (qox - u0s * qnx) + side * qnx + wdx;
+      Y[q] = qsy + (qoy - u0s * qny) + side * qny + wdy;
+      Z[q] = qoz + u0s * sph * swell + zw;
+    }
+
+    /* sway about the pin, the viewer's turn, then project */
+    var az = A * 0.1 + A * 0.07 * Math.sin(p + 0.4) + A * 0.025 * Math.sin(2 * p + 1.3);
+    var ax = A * 0.04 * Math.sin(p + 1.9);
+    var cz = Math.cos(az), sz = Math.sin(az), cxr = Math.cos(ax), sxr = Math.sin(ax), cyr = Math.cos(yaw), syr = Math.sin(yaw);
+    var x, y, z, x1, y1, y2, z2, pf;
+    Sr = Math.min(H / 6.0, W / 4.5) * rs; ox = RW / 2; oy = RH * 0.5;
+    for (q = 0; q < N; q++) {
+      x = X[q] - PX; y = Y[q] - PY; z = Z[q] - PZ;
+      x1 = x * cz - y * sz; y1 = x * sz + y * cz;
+      y2 = y1 * cxr - z * sxr; z2 = y1 * sxr + z * cxr;
+      x = x1 * cyr + z2 * syr + PX; z = -x1 * syr + z2 * cyr + PZ; y2 += PY;
+      X[q] = x; Y[q] = y2; Z[q] = z;
+      pf = 16 / (16 - z);
+      SX[q] = ox + (x - 0.9) * Sr * pf;
+      SY[q] = oy - (y2 + 1.7) * Sr * pf;
+    }
+
+    /* smooth vertex normals */
+    NX.fill(0); NY.fill(0); NZ.fill(0);
+    var f, a, b, c, ux, uy, uz, vx, vy, vz, nx, ny, nz, l, row, s0, s1b, sx, sy, sz2;
+    for (f = 0; f < T; f++) {
+      a = tris[f * 3]; b = tris[f * 3 + 1]; c = tris[f * 3 + 2];
+      ux = X[b] - X[a]; uy = Y[b] - Y[a]; uz = Z[b] - Z[a];
+      vx = X[c] - X[a]; vy = Y[c] - Y[a]; vz = Z[c] - Z[a];
+      nx = uy * vz - uz * vy; ny = uz * vx - ux * vz; nz = ux * vy - uy * vx;
+      NX[a] += nx; NY[a] += ny; NZ[a] += nz;
+      NX[b] += nx; NY[b] += ny; NZ[b] += nz;
+      NX[c] += nx; NY[c] += ny; NZ[c] += nz;
+    }
+    for (row = 0; row <= 0; row += 1) { // the pin end is one point
+      sx = sy = sz2 = 0;
+      for (i = 0; i <= NU; i++) { q = row * (NU + 1) + i; sx += NX[q]; sy += NY[q]; sz2 += NZ[q]; }
+      for (i = 0; i <= NU; i++) { q = row * (NU + 1) + i; NX[q] = sx; NY[q] = sy; NZ[q] = sz2; }
+    }
+    for (q = 0; q < N; q++) {
+      l = 1 / (Math.sqrt(NX[q] * NX[q] + NY[q] * NY[q] + NZ[q] * NZ[q]) || 1);
+      NX[q] *= l; NY[q] *= l; NZ[q] *= l;
+    }
+
+    /* surface tangents so the pebbling can tilt the normal */
+    var ja, jb, qa, qc, dxv, dyv, dzv, dtn;
+    for (j = 0; j <= NV; j++) {
+      ja = j > 0 ? j - 1 : 0; jb = j < NV ? j + 1 : NV;
+      for (i = 0; i <= NU; i++) {
+        q = j * (NU + 1) + i;
+        qa = j * (NU + 1) + (i > 0 ? i - 1 : 0); qc = j * (NU + 1) + (i < NU ? i + 1 : NU);
+        dxv = X[qc] - X[qa]; dyv = Y[qc] - Y[qa]; dzv = Z[qc] - Z[qa];
+        dtn = dxv * NX[q] + dyv * NY[q] + dzv * NZ[q];
+        dxv -= dtn * NX[q]; dyv -= dtn * NY[q]; dzv -= dtn * NZ[q];
+        l = 1 / Math.max(1e-3, Math.sqrt(dxv * dxv + dyv * dyv + dzv * dzv));
+        tgx[q] = dxv * l; tgy[q] = dyv * l; tgz[q] = dzv * l;
+        qa = ja * (NU + 1) + i; qc = jb * (NU + 1) + i;
+        dxv = X[qc] - X[qa]; dyv = Y[qc] - Y[qa]; dzv = Z[qc] - Z[qa];
+        dtn = dxv * NX[q] + dyv * NY[q] + dzv * NZ[q];
+        dxv -= dtn * NX[q]; dyv -= dtn * NY[q]; dzv -= dtn * NZ[q];
+        l = 1 / Math.max(1e-3, Math.sqrt(dxv * dxv + dyv * dyv + dzv * dzv));
+        bnx[q] = dxv * l; bny[q] = dyv * l; bnz[q] = dzv * l;
+      }
+    }
+
+    /* the wall's light and the cloth's two soft shadows (key bulb: darker; fill bulb: lighter and softer) */
+    castShadow(M1, LX[0], LY[0], LZ[0], 3);
+    castShadow(M2, LX[1], LY[1], LZ[1], 4);
+    var k;
+
+    /* the grain is fixed: the same speckle sits on the picture all the time */
+    var gx = 37, gy = 91, gx2 = 143, gy2 = 19;
+
+    /* rasterize the cloth into two layers (its nearest and farthest surface), lit by the three bulbs.
+       It is thin film, only partly opaque: the far side and the wall show through. There is no shine, only soft light that also glows through from behind. */
+    zb.fill(-1e9); ZF.fill(1e9);
+    var x0, y0, x2, y2s, area, inv, minx, maxx, miny, maxy, px, py, w0, w1, w2, zz, o, xx, yy;
+    var z0, zq1, zq2, n0x, n0y, n0z, n1x, n1y, n1z, n2x, n2y, n2z, uu0, uu1, uu2, vv0, vv1, vv2, uu, vv, ti, ti2, pxx, pyy;
+    var dx, dy, dz, d2, ivd, ndl, wr, tw, at, cd, c0, ctot, sl, trn, ss, nn, ap, ac, kf, ee, isN, isF, bu, bv, tx1, ty1, tz1, bx1, by1, bz1, nzg, hm, hfp, ga, gbb, eps = 0.002;
+    for (f = 0; f < T; f++) {
+      a = tris[f * 3]; b = tris[f * 3 + 1]; c = tris[f * 3 + 2];
+      x0 = SX[a]; y0 = SY[a]; x1 = SX[b]; y1 = SY[b]; x2 = SX[c]; y2s = SY[c];
+      area = (x1 - x0) * (y2s - y0) - (x2 - x0) * (y1 - y0);
+      if (area > -1e-4 && area < 1e-4) continue;
+      inv = 1 / area;
+      minx = Math.max(0, Math.floor(Math.min(x0, x1, x2))); maxx = Math.min(RW - 1, Math.ceil(Math.max(x0, x1, x2)));
+      miny = Math.max(0, Math.floor(Math.min(y0, y1, y2s))); maxy = Math.min(RH - 1, Math.ceil(Math.max(y0, y1, y2s)));
+      if (minx > maxx || miny > maxy) continue;
+      z0 = Z[a]; zq1 = Z[b]; zq2 = Z[c];
+      n0x = NX[a]; n0y = NY[a]; n0z = NZ[a]; n1x = NX[b]; n1y = NY[b]; n1z = NZ[b]; n2x = NX[c]; n2y = NY[c]; n2z = NZ[c];
+      uu0 = UU[a]; uu1 = UU[b]; uu2 = UU[c]; vv0 = VV[a]; vv1 = VV[b]; vv2 = VV[c];
+      for (yy = miny; yy <= maxy; yy++) {
+        py = yy + 0.5;
+        for (xx = minx; xx <= maxx; xx++) {
+          px = xx + 0.5;
+          w0 = ((x1 - px) * (y2s - py) - (x2 - px) * (y1 - py)) * inv;
+          w1 = ((x2 - px) * (y0 - py) - (x0 - px) * (y2s - py)) * inv;
+          w2 = 1 - w0 - w1;
+          if (w0 < -eps || w1 < -eps || w2 < -eps) continue;
+          hfp = w0 * HF[a] + w1 * HF[b] + w2 * HF[c];
+          if (hfp > 0) continue;                                              // a hole: the wall shows straight through
+          zz = w0 * z0 + w1 * zq1 + w2 * zq2;
+          o = yy * RW + xx;
+          isN = zz > zb[o]; isF = zz < ZF[o];
+          if (!isN && !isF) continue;
+          uu = w0 * uu0 + w1 * uu1 + w2 * uu2; vv = w0 * vv0 + w1 * vv1 + w2 * vv2;
+          ti = ((((vv * TS) | 0) & 255) << 8) | (((uu * TS) | 0) & 255);
+          ti2 = (((((vv * 0.5 * TS) | 0)) & 255) << 8) | ((((uu * 0.5 * TS) | 0)) & 255);
+          nx = w0 * n0x + w1 * n1x + w2 * n2x; ny = w0 * n0y + w1 * n1y + w2 * n2y; nz = w0 * n0z + w1 * n1z + w2 * n2z;
+          l = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz + 1e-9);
+          nzg = (nz < 0 ? -nz : nz) * l;
+          tx1 = w0 * tgx[a] + w1 * tgx[b] + w2 * tgx[c]; ty1 = w0 * tgy[a] + w1 * tgy[b] + w2 * tgy[c]; tz1 = w0 * tgz[a] + w1 * tgz[b] + w2 * tgz[c];
+          bx1 = w0 * bnx[a] + w1 * bnx[b] + w2 * bnx[c]; by1 = w0 * bny[a] + w1 * bny[b] + w2 * bny[c]; bz1 = w0 * bnz[a] + w1 * bnz[b] + w2 * bnz[c];
+          bu = hu[ti] * BS; bv = hv[ti] * BS;                                       // fine pebbling tilts the normal
+          nx -= bu * tx1 + bv * bx1; ny -= bu * ty1 + bv * by1; nz -= bu * tz1 + bv * bz1;
+          l = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz + 1e-9);
+          nx *= l; ny *= l; nz *= l;
+          if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+          pxx = w0 * X[a] + w1 * X[b] + w2 * X[c]; pyy = w0 * Y[a] + w1 * Y[b] + w2 * Y[c];
+          sl = 0.03; trn = 0; c0 = 0; ctot = 0;
+          for (k = 0; k < 3; k++) {                                       // each bulb: soft wrapped diffuse light, no specular
+            dx = LX[k] - pxx; dy = LY[k] - pyy; dz = LZ[k] - zz;
+            d2 = dx * dx + dy * dy + dz * dz + 1e-6; ivd = 1 / Math.sqrt(d2);
+            ndl = (nx * dx + ny * dy + nz * dz) * ivd;
+            wr = 0.5 + 0.5 * ndl; if (wr < 0) wr = 0;
+            tw = 0.5 - 0.5 * ndl; if (tw < 0) tw = 0;
+            at = LI[k] / (1 + 0.018 * d2);
+            cd = at * wr * wr; sl += cd; ctot += cd; if (k === 0) c0 = cd;
+            trn += at * tw * tw;                                          // light passing through the film glows on its far side
+          }
+          ee = 1 - nzg;
+          hm = w0 * HEM[a] + w1 * HEM[b] + w2 * HEM[c];                          // the hem: film is denser where it is folded over at the edge
+          if (hfp > -0.03) { hd = 0.9 * (1 + hfp * 33.3); if (hd > hm) hm = hd; }   // film is folded thicker around a hole's rim
+          ss = sl + 0.22 * trn - 0.05 * ee * ee - 0.08 * hm + (th[ti] - 0.5) * 0.08;
+          ss = 0.42 + (ss - 0.42) * 1.5;                                  // light-to-shade contrast of the film
+          if (ss > 0.72) ss = 0.72 + (ss - 0.72) * 0.25;                  // soft glow, never a hot spot
+          ap = 0.78 + 0.22 * (ee > hm ? ee : hm);                                            // see-through face on, denser toward the edges
+          kf = ctot > 1e-6 ? c0 / ctot : 0.5;
+          ac = (kf - 0.55) * 2.4 + (th[ti2] - 0.5) * 1.4 + 0.25 * Math.sin(p + vv * 3.1);
+          if (ac < -1) ac = -1; else if (ac > 1) ac = 1;
+          if (isN) {
+            zb[o] = zz; SN[o] = ss; AN[o] = ap; ACN[o] = ac;
+            ga = w0 * GA[a] + w1 * GA[b] + w2 * GA[c]; gbb = w0 * GB[a] + w1 * GB[b] + w2 * GB[c];   // the film's own grain: fixed to the material, so it travels and stretches with it
+            GNb[o] = (G1[((((gbb * 150 + 4096) | 0) & 255) << 8) | (((ga * 150 + 4096) | 0) & 255)] * 0.62 + G2[((((gbb * 75 + 4096) | 0) & 255) << 8) | (((ga * 75 + 4096) | 0) & 255)] * 0.38) * 0.007843 - 1;
+          }
+          if (isF) { ZF[o] = zz; SFa[o] = ss; }
+        }
+      }
+    }
+
+    /* compose every pixel on a see-through canvas: the near side of the film over its far side over the soft cast shadow. No wall is drawn at all. */
+    var srow, gyA, gyB, aN, aF, wN, wF, wS, acc, ai, alpha, sa, fx, fy, shT = 0.22, FILM_OP = 0.45;
+    for (yy = 0; yy < RH; yy++) {
+      row = yy * RW; srow = (yy >> 2) * SW;
+      gyA = ((yy + gy) & 255) << 8; gyB = (((yy >> 1) + gy2) & 255) << 8;
+      for (xx = 0; xx < RW; xx++) {
+        o = row + xx; k = srow + (xx >> 2);
+        fx = Math.min(xx, RW - 1 - xx) / (RW * 0.14); fy = Math.min(yy, RH - 1 - yy) / (RH * 0.08); fx = fx < fy ? fx : fy;
+        if (fx > 1) fx = 1; fx = fx * fx * (3 - 2 * fx);                           // the shadow fades out before the canvas edge, so it is never cut off
+        sa = (0.2 * M1[k] + 0.1 * M2[k]) * 1.8 * fx;                             // how dark the shadow is here
+        nn = (G1[gyA | ((xx + gx) & 255)] * 0.62 + G2[gyB | (((xx >> 1) + gx2) & 255)] * 0.38) * 0.007843 - 1;
+        if (zb[o] > -1e8) {
+          /* the film is drawn at FILM_OP opacity over its cast shadow, and the shadow keeps its full strength (it is also seen through the film) */
+          aN = AN[o]; aF = zb[o] - ZF[o] > 0.05 ? 0.6 : 0;
+          wN = aN; wF = (1 - aN) * aF;
+          var cov = wN + wF, Af = cov * FILM_OP, As = sa, cF, cS, wf, ws, rr, gg, bb2;
+          alpha = Af + As * (1 - Af);
+          if (alpha < 0.004) { buf[o] = 0; continue; }
+          if (cov > 0) {
+            ss = (wN * SN[o] + wF * SFa[o]) / cov; acc = wN * ACN[o] / cov;
+            nn = (wN * GNb[o] + wF * nn) / cov;
+          } else { ss = shT; acc = 0; }
+          ss += nn * GR * (0.016 + 0.52 * ss * (1 - ss > 0 ? 1 - ss : 0));
+          if (ss < 0) ss = 0; else if (ss > 1) ss = 1;
+          ai = (acc * 8 + 8.5) | 0; if (ai < 0) ai = 0; else if (ai > 16) ai = 16;
+          cF = LUT[(ai << 10) | ((ss * 1023) | 0)];
+          wf = Af / alpha; ws = As * (1 - Af) / alpha;
+          rr = (cF & 255) * wf + 0x96 * ws; gg = ((cF >> 8) & 255) * wf + 0x7E * ws; bb2 = ((cF >> 16) & 255) * wf + 0x70 * ws;
+          if (alpha > 1) alpha = 1;
+          buf[o] = ((((alpha * 255) | 0) << 24) | ((bb2 | 0) << 16) | ((gg | 0) << 8) | (rr | 0)) >>> 0; continue;
+        } else {
+          alpha = sa * (1 + 0.3 * GR * nn); ss = shT; acc = 0;
+          if (alpha < 0.004) { buf[o] = 0; continue; }
+          if (alpha > 1) alpha = 1;
+          buf[o] = 0x00707E96 | (((alpha * 255) | 0) << 24); continue;   // cast shadow is a deep tan (the dots' colour), no grey
+        }
+        ss += nn * GR * (0.016 + 0.52 * ss * (1 - ss > 0 ? 1 - ss : 0));
+        if (ss < 0) ss = 0; else if (ss > 1) ss = 1;
+        ai = (acc * 8 + 8.5) | 0; if (ai < 0) ai = 0; else if (ai > 16) ai = 16;
+        buf[o] = (LUT[(ai << 10) | ((ss * 1023) | 0)] & 0xffffff) | (((alpha * 255) | 0) << 24);
+      }
+    }
+
+    rctx.putImageData(img, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(rc, 0, 0, canvas.width, canvas.height);
+  }
+
+  /* ---- playback: runs only while visible, honours reduced motion ---- */
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var A = parseFloat(canvas.dataset.wind) || 1, GR = parseFloat(canvas.dataset.grain);   // optional: data-wind="1" data-grain="1"
+  if (!(GR >= 0)) GR = 0.4;   // quiet grain
+  var tt = reduce ? 20 : 0, pw = reduce ? 3 : 0, playing = false, inView = true, last = 0, raf = 0;
+  function gust() {                    // gusts that swell and fade at random-feeling moments
+    var gu = 0.8 + 0.25 * Math.sin(0.31 * tt) + 0.18 * Math.sin(0.83 * tt + 1.1) + 0.1 * Math.sin(1.9 * tt + 0.4) + 0.12 * Math.sin(0.083 * tt);
+    var gb = Math.sin(0.13 * tt + 2) * Math.sin(0.057 * tt + 0.5); if (gb > 0) gu += 0.6 * gb * gb;
+    return clamp(gu, 0.4, 1.4);
+  }
+  var adapt = 0;
+  function paint() { if (!W) return; var t0 = performance.now(); draw(tt, pw, A * gust(), GR); adapt = Math.max(adapt * 0.97, (performance.now() - t0) * 3 / 1000); window.__flagAdapt = adapt; }
+  function frame(now) {
+    raf = 0;
+    var gap = adapt;
+    if (gap && (now - last) / 1000 < gap) { if (playing) raf = requestAnimationFrame(frame); return; }
+    var dt = Math.min(0.05, (now - last) / 1000); last = now;
+    tt += dt; pw += dt * TAU / 6 * (0.75 + 0.4 * gust());
+    paint();
+    if (playing) raf = requestAnimationFrame(frame);
+  }
+  function update() {
+    playing = inView && !document.hidden && !reduce;
+    if (playing && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+  }
+  function onSize() { resize(); paint(); }
+  if (window.ResizeObserver) new ResizeObserver(onSize).observe(canvas); else window.addEventListener("resize", onSize);
+  if (window.IntersectionObserver) new IntersectionObserver(function (en) { inView = en[0].isIntersecting; update(); }).observe(canvas);
+  document.addEventListener("visibilitychange", update);
+  onSize(); update();
+})();
+</script>
+<script>
+/* Wind flag: only visible while the pointer is on a "+", centred, 85% of the frame height. Hidden (and not animating) otherwise. */
+(function () {
+  var flag = document.getElementById('flag'), hideT = 0;
+  var look = { dx: 0, dy: 0, rot: 0, flip: 1, wide: 1.6 };
+  // Every dot colour on the map, picked at random for each hover. The background grey is only ever used for the darkest shades.
+  var WARM = [[217, 168, 132], [226, 190, 170], [214, 150, 110], [222, 222, 245], [208, 224, 255], [196, 170, 160]];
+  var BLUE = [183, 206, 255];
+  function pick(a) { return a[(Math.random() * a.length) | 0]; }
+  function newPalette() {
+    var dark = Math.random() < 0.5 ? [138, 136, 136] : [150, 116, 96];      // grey or bark brown, deepest shade only
+    var c1 = pick(WARM), c2 = pick(WARM), c3 = pick(WARM);
+    var hi = Math.random() < 0.5 ? [236, 242, 255] : [244, 228, 214];
+    if (window.__flagPalette) window.__flagPalette([
+      [0.00, dark[0], dark[1], dark[2]],
+      [0.14, (dark[0] + c1[0]) / 2, (dark[1] + c1[1]) / 2, (dark[2] + c1[2]) / 2],
+      [0.26, c1[0], c1[1], c1[2]],
+      [0.40, BLUE[0], BLUE[1], BLUE[2]],
+      [0.68, 190, 212, 255],
+      [0.80, c2[0], c2[1], c2[2]],
+      [0.90, c3[0], c3[1], c3[2]],
+      [1.00, hi[0], hi[1], hi[2]]
+    ]);
+  }
+  function reroll() {   // every hover pins the flag a little differently: nudged, tilted, sometimes mirrored
+    look.dx = (Math.random() - 0.5) * 0.06 * innerWidth;
+    look.dy = 0.16 * innerHeight + (Math.random() - 0.5) * 0.06 * innerHeight;   // sits lower, so the body of the flag reads as centred
+    look.rot = (Math.random() - 0.5) * 24;
+    look.flip = Math.random() < 0.5 ? -1 : 1;
+    look.wide = (1.35 + Math.random() * 0.7) * 1.1;     // it also spreads sideways, a different amount each time
+  }
+  function place() {
+    var h = Math.round(innerHeight * 0.85 * 5), w = Math.round(h * 19 / 36 * look.wide);
+    flag.style.width = w + 'px'; flag.style.height = h + 'px';
+    flag.style.transform = 'translate(' + Math.round((innerWidth - w) / 2 + look.dx) + 'px,' + Math.round((innerHeight - h) / 2 + look.dy) + 'px) rotate(' + look.rot.toFixed(1) + 'deg) scaleX(' + look.flip + ')';
+  }
+  function show() { clearTimeout(hideT); reroll(); newPalette(); place(); flag.classList.remove('off'); void flag.offsetWidth; flag.style.opacity = 1; }
+  function hide() { flag.style.opacity = 0; hideT = setTimeout(function () { flag.classList.add('off'); }, 950); }
+  document.querySelectorAll('.plus').forEach(function (p) { p.addEventListener('mouseenter', show); p.addEventListener('mouseleave', hide); });
+  addEventListener('resize', function () { if (!flag.classList.contains('off')) place(); });
+})();
+</script>
+</body>
+</html>
