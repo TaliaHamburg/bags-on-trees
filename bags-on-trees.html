@@ -3372,7 +3372,7 @@ document.querySelectorAll('.plus').forEach(p => {
     }
 
     /* compose every pixel on a see-through canvas: the near side of the film over its far side over the soft cast shadow. No wall is drawn at all. */
-    var srow, gyA, gyB, aN, aF, wN, wF, wS, acc, ai, alpha, sa, fx, fy, shT = 0.22, FILM_OP = 0.45;
+    var srow, gyA, gyB, aN, aF, wN, wF, wS, acc, ai, alpha, sa, fx, fy, shT = 0.22, FILM_OP = 0.2;
     for (yy = 0; yy < RH; yy++) {
       row = yy * RW; srow = (yy >> 2) * SW;
       gyA = ((yy + gy) & 255) << 8; gyB = (((yy >> 1) + gy2) & 255) << 8;
