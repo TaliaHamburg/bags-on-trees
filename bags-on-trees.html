@@ -681,7 +681,7 @@
 
     /* Homepage + loader: bigger logotype that fills the width, text hugs the edges */
     .stage-home .big-title,
-    #loading-screen .loading-title { font-size: 17vw; }
+    #loading-screen .loading-title { font-size: var(--title-fs, 17vw); }
     #page-flow { padding: 4.5rem 1.25rem 2rem; }
     .flow-stage { inset: 4.5rem 1.25rem 2rem; }
     .stage-home { padding-top: clamp(2rem, 9vh, 5rem); row-gap: 1.6rem; }
@@ -2944,7 +2944,19 @@ function assetsReady() {
 
 
 /* Nudge the big homepage title so the ink of its first letter (not its text box) lines up with the "+" */
+function fitPhoneTitle() {   // phones: the title is as wide as the page allows, edge to edge between the 1.25rem side margins
+  const root = document.documentElement, t = document.querySelector('.stage-home .big-title');
+  if (!t) return;
+  if (window.innerWidth > 700) { root.style.removeProperty('--title-fs'); return; }
+  root.style.setProperty('--title-fs', '100px');
+  const r = document.createRange(); r.selectNodeContents(t);
+  const w100 = r.getBoundingClientRect().width;      // the box edge sits at the last letter's ink
+  const margin = parseFloat(getComputedStyle(root).fontSize) * 1.25;
+  const size = Math.min(130, (window.innerWidth - 2 * margin) / w100 * 100);
+  root.style.setProperty('--title-fs', size.toFixed(2) + 'px');
+}
 function alignTitleInk() {
+  fitPhoneTitle();
   const t = document.querySelector('.stage-home .big-title');
   if (!t) return;
   try {
