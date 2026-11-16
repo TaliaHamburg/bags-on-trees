@@ -2113,9 +2113,19 @@ window.addEventListener('mousemove', (e) => {
   applyHover(e.clientX, e.clientY, false);
 });
 
+/* When the welcome scroll hands over to the map, the trackpad is still coasting. That leftover scroll must not
+   count as a zoom-out, so wheel input is ignored until the scroll has gone quiet for a moment (or 2.5 s passed). */
+let wheelLockUntil = 0, lastWheelAt = 0;
 mapStage.addEventListener('wheel', (e) => {
   if (state.page !== 'map') return;
   e.preventDefault();
+  const nowW = e.timeStamp || performance.now();   // when the wheel tick happened, not when a busy frame got to it
+  const quiet = lastWheelAt > 0 && nowW - lastWheelAt > 250;   // the first tick after the hand-over never counts as a pause
+  lastWheelAt = nowW;
+  if (wheelLockUntil) {
+    if (nowW > wheelLockUntil || quiet && nowW > wheelLockUntil - 2300) wheelLockUntil = 0;
+    else return;
+  }
   const factor = Math.exp(-e.deltaY * 0.0015);
   view.targetScale = Math.max(0.4, Math.min(20, view.targetScale * factor));
 }, { passive: false });
@@ -2181,6 +2191,7 @@ function goTo(pageId) {
   // Clicking Map while already on Map: do nothing
   if (state.page === 'map' && pageId === 'map') return;
 
+  if (pageId === 'map' && state.page === 'flow') { wheelLockUntil = performance.now() + 2500; lastWheelAt = 0; }
   state.page = pageId;
   if (pageId === 'index') requestAnimationFrame(() => fitIndexColumns());
 
@@ -2415,12 +2426,12 @@ function fitIndexColumns() {
   if (widths.some((w) => w > 0)) {
     const cols = widths.map((w) => Math.ceil(w) + 2);
     container.style.setProperty('--ix-cols', cols.map((w) => w + 'px').join(' '));
-    // spread the columns across the full row: the left-over width is shared equally between the four gaps
+    // the five columns still sit on a grid with identical gaps; the gap is now about half of what filling the whole row gave
     const row = container.querySelector('.index-row');
     const cs = getComputedStyle(row);
     const inner = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    const gap = (inner - cols.reduce((a, b) => a + b, 0)) / 4;
-    container.style.setProperty('--ix-gap', Math.max(16, gap) + 'px');
+    const spread = (inner - cols.reduce((a, b) => a + b, 0)) / 4;
+    container.style.setProperty('--ix-gap', Math.max(24, spread * 0.5) + 'px');
   }
 }
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitIndexColumns());
