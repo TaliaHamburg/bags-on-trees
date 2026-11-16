@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#AAAAAA">
+<meta name="color-scheme" content="light">
 <title>Bags on trees</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,6 +40,7 @@
   }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; }
+  html { background: var(--bg); }
   body {
     background: var(--bg);
     color: var(--ink);
@@ -295,11 +298,21 @@
     font-size: 0.7rem;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--grey-3);
+    color: var(--ink);
     z-index: 60;
     pointer-events: none;
-    animation: hintFade 4s ease forwards 1s;
+    opacity: 0;
+    text-align: center;
+    transition: opacity .6s ease;
   }
+  .scroll-hint.show { animation: hintBob 2.2s ease-in-out infinite; }
+  .scroll-hint.gone { animation: none; opacity: 0 !important; }
+  .scroll-hint::after {
+    content: ''; display: block; width: 1px; height: 2.2rem; margin: .7rem auto 0;
+    background: currentColor; transform-origin: top; animation: hintLine 2.2s ease-in-out infinite;
+  }
+  @keyframes hintBob { 0%, 100% { opacity: .45; transform: translate(-50%, 0); } 50% { opacity: 1; transform: translate(-50%, -6px); } }
+  @keyframes hintLine { 0% { transform: scaleY(0); } 60% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
   @keyframes hintFade {
     0%       { opacity: 0; }
     20%, 70% { opacity: 0.7; }
@@ -649,6 +662,12 @@
   @media (hover: none) {
     .cursor, #plus-tooltip { display: none !important; }
   }
+  /* Phones: the full-screen blended texture is skipped (lighter and smoother); the flat grey is set to match the textured look on the computer */
+  @media (hover: none), (max-width: 700px) {
+    :root { --bg: #A7A7A7; }
+    body::after { display: none; }
+    .bloom-card, #plus-tooltip { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  }
 
   /* ──────────────────────────────────────────────────────────────
      PHONES / NARROW SCREENS
@@ -669,7 +688,7 @@
     .stage-home .blurb { font-size: 1rem; line-height: 1.38; }
     .stage-home .count-line { font-size: 0.95rem; margin-top: 0; }
     .stage-intro p { font-size: 1rem; margin-top: 12vh; }
-    .scroll-hint { bottom: 1.4rem; }
+    .scroll-hint { bottom: 1.6rem; font-size: 0.85rem; }
 
     /* Index: each row becomes two lines — tree + date, then address + time */
     #page-index .container { padding-top: 4.5rem; }
@@ -1051,6 +1070,12 @@ async function fetchArena() {
       const cached = JSON.parse(localStorage.getItem(ARENA_CACHE_KEY) || 'null');
       if (Array.isArray(cached) && cached.length) {
         console.warn(`[arena] Using last saved copy (${cached.length} entries)`);
+        if (IS_OWNER) setTimeout(() => {   // owner view (?owner): say clearly when the numbers are NOT live
+          const box = document.createElement('div'); box.className = 'owner-note';
+          box.innerHTML = `<button aria-label="Dismiss">×</button><b>Are.na did not answer.</b><br>Showing the last saved copy (${cached.length} bags), so new uploads are missing. Reload to try again.`;
+          box.querySelector('button').addEventListener('click', () => box.remove());
+          document.body.appendChild(box);
+        }, 500);
         return cached.map(c => ({ ...c, date: c.date ? new Date(c.date) : null }));
       }
     } catch (_) {}
@@ -1679,9 +1704,10 @@ function colorForSpecies(species) {
    ════════════════════════════════════════════════════════════ */
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let W, H, DPR;
+const LITE = (window.matchMedia('(hover: none) and (pointer: coarse)').matches) || window.innerWidth <= 700;   // phones: lighter drawing
+let W, H, DPR, frameN = 0;
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  DPR = Math.min(window.devicePixelRatio || 1, LITE ? 1.5 : 2);
   W = window.innerWidth;
   H = window.innerHeight;
   canvas.width = W * DPR;
@@ -1801,6 +1827,7 @@ function introProgress(t) {
 }
 
 function loop(t = 0) {
+  if (state.page === 'grid' || state.page === 'index') { requestAnimationFrame(loop); return; }   // nothing to draw behind these pages
   // Edge-panning: when cursor nears a screen edge on the map page (and not dragging),
   // continuously pan the view in that direction.
   if (state.page === 'map' && !view.isDragging && !IS_TOUCH) {
@@ -1841,7 +1868,9 @@ function loop(t = 0) {
   const eased = 1 - Math.pow(1 - intro, 3);
   const blurAmt = (1 - eased) * 12;
   canvas.style.filter = blurAmt > 0.5 ? `blur(${blurAmt.toFixed(2)}px)` : 'none';
-  const lodMultiplier = 0.15 + eased * 0.85;
+  const lodMultiplier = (0.15 + eased * 0.85) * (LITE ? 0.55 : 1);   // phones draw about half the dots
+  // phones: the map is redrawn every other frame (the motion still updates every frame), which halves the work
+  if (LITE && (frameN++ & 1)) { requestAnimationFrame(loop); return; }
 
   ctx.clearRect(0, 0, W, H);
   const px = (view.mouseX / W - 0.5) * 20;
@@ -2253,6 +2282,7 @@ function setActiveBlurb(idx) {
 
 function applyScrollProgress() {
   const e = scrollProgress;
+  const hintEl = document.querySelector('.scroll-hint'); if (hintEl) hintEl.classList.toggle('gone', e > 0.03);   // the cue goes away on the first scroll
   // Gentler zoom curve — eases in slowly so the map drifts up rather than rushing
   const eased = e * e * (3 - 2 * e); // smoothstep
 
@@ -2730,6 +2760,7 @@ function positionLoaderTitle() {
 // The homepage number counts up only once the loading page is gone and the site is actually in view
 let homeCountStarted = false;
 function startHomeCount() {
+  const hint = document.querySelector('.scroll-hint'); if (hint) setTimeout(() => hint.classList.add('show'), 600);
   if (homeCountStarted) return;
   homeCountStarted = true;
   animateCount(document.getElementById('home-count'), state.entries.length);
@@ -2792,7 +2823,8 @@ async function init() {
     state.introReady = true;
     buildIndexRows();
     buildGrid();
-    await Promise.race([loadTreeAddresses(), sleep(8000)]).catch(() => {});   // street addresses too, before the site opens
+    if (LITE) loadTreeAddresses().then(() => { buildIndexRows(); buildGrid(); }).catch(() => {});   // phones: addresses stream in after the site is open
+    else await Promise.race([loadTreeAddresses(), sleep(8000)]).catch(() => {});   // street addresses too, before the site opens
     buildIndexRows();
     buildGrid();
     await assetsReady();
