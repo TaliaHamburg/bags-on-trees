@@ -1,0 +1,28 @@
+# Rebuilds the tree files from NYC Open Data twice a year (1 Jan and 1 Jul) and commits them.
+# Run it by hand any time: Actions tab > "Refresh tree data" > Run workflow.
+name: Refresh tree data
+on:
+  schedule:
+    - cron: '0 6 1 1,7 *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build tree files
+        run: node build-trees.mjs --stable .
+        env:
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}   # optional
+      - name: Commit if changed
+        run: |
+          git config user.name "tree-data-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add trees.bin trees-species.json trees-addresses.txt
+          git diff --cached --quiet || (git commit -m "Refresh tree data $(date -u +%Y-%m-%d)" && git push)
