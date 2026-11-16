@@ -796,12 +796,13 @@
        Tree name + date/time share the first line, the botanical name sits under the tree name, the address gets the full width. */
     .bloom-card { box-sizing: border-box; grid-template-columns: minmax(0, 1fr) auto; row-gap: .25rem; column-gap: 1rem; white-space: normal;
       padding: 1rem 1.25rem calc(0.9rem + env(safe-area-inset-bottom, 0px)); font-size: .8em; }
-    /* same hierarchy as the phone Index: tree + date first, botanical name + time under them in grey, address last */
+    /* phone footer: tree name + botanical name on the left; street on the right with the date and the time next to it underneath */
+    .bloom-card { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); align-items: baseline; }
     .bloom-card .card-tree { grid-column: 1; grid-row: 1; }
-    .bloom-card .card-datetime { grid-column: 2; grid-row: 1 / span 2; justify-self: end; white-space: nowrap; display: flex; flex-direction: column; align-items: flex-end; row-gap: .25rem; }
-    .bloom-card .card-time { color: var(--grey-3); font-size: 0.9em; }
     .bloom-card .card-latin { grid-column: 1; grid-row: 2; color: var(--grey-3); font-size: 0.9em; }
-    .bloom-card .card-address { grid-column: 1 / -1; grid-row: 3; color: var(--grey-3); font-size: 0.9em; overflow: visible; text-overflow: clip; white-space: normal; }
+    .bloom-card .card-address { grid-column: 2; grid-row: 1; justify-self: end; text-align: right; color: var(--ink); font-size: 1em; overflow: visible; text-overflow: clip; white-space: normal; }
+    .bloom-card .card-datetime { grid-column: 2; grid-row: 2; justify-self: end; display: flex; flex-direction: row; align-items: baseline; column-gap: .8rem; white-space: nowrap; font-size: 0.9em; }
+    .bloom-card .card-time { color: var(--grey-3); }
   }
   /* While a video plays: white text with a difference blend, so it always contrasts with the footage */
   #page-map.video-active .bloom-card { mix-blend-mode: difference; }
@@ -2005,6 +2006,7 @@ bgWrap.addEventListener('click', () => {
   }
 });
 const card = document.getElementById('bloom-card');
+function setCardAddress(t) { cardAddress.textContent = window.innerWidth <= 700 ? String(t).split(',')[0].trim() : t; }   // phones show just the street
 const cardTree = document.getElementById('card-tree');
 const cardDate = document.getElementById('card-date');
 const cardTime = document.getElementById('card-time');
@@ -2103,9 +2105,9 @@ function applyHover(x, y, isTap) {
     if (hit.matchedTree && (hit.matchedTree.zip_city || hit.matchedTree.zipcode)) {
       const street = (hit.address || '').split(',')[0].trim() || hit.matchedTree.address || '';
       const parts = [street, hit.matchedTree.zip_city, hit.matchedTree.zipcode].filter(Boolean);
-      cardAddress.textContent = parts.join(', ');
+      setCardAddress(parts.join(', '));
     } else {
-      cardAddress.textContent = hit.address || '';
+      setCardAddress(hit.address || '');
     }
     cardDate.textContent = formatDate(hit.date);
     cardTime.textContent = formatTime(hit.hour);
@@ -2116,7 +2118,7 @@ function applyHover(x, y, isTap) {
   } else if (hitTree) {
     cardTree.textContent = hitTree.species || 'unknown tree';
     cardLatin.textContent = hitTree.latin || '';
-    cardAddress.textContent = [hitTree.address, hitTree.zip_city, hitTree.zipcode].filter(Boolean).join(', ');
+    setCardAddress([hitTree.address, hitTree.zip_city, hitTree.zipcode].filter(Boolean).join(', '));
     cardDate.textContent = '';
     cardTime.textContent = '';
     cardDatetime.style.display = 'none';
