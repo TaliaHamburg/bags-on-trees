@@ -3441,13 +3441,13 @@ document.querySelectorAll('.plus').forEach(p => {
   }
   function reroll() {   // every hover pins the flag a little differently: nudged, tilted, sometimes mirrored
     look.dx = (Math.random() - 0.5) * 0.06 * innerWidth;
-    look.dy = 0.16 * innerHeight + (Math.random() - 0.5) * 0.06 * innerHeight;   // sits lower, so the body of the flag reads as centred
+    look.dy = 0.31 * innerHeight + (Math.random() - 0.5) * 0.06 * innerHeight;   // sits lower, so the body of the flag reads as centred
     look.rot = (Math.random() - 0.5) * 24;
     look.flip = Math.random() < 0.5 ? -1 : 1;
     look.wide = (1.35 + Math.random() * 0.7) * 1.1;     // it also spreads sideways, a different amount each time
   }
   function place() {
-    var h = Math.round(innerHeight * 0.85 * 5), w = Math.round(h * 19 / 36 * look.wide);
+    var h = Math.round(innerHeight * 0.85 * 5 * 0.95), w = Math.round(h * 19 / 36 * look.wide);
     flag.style.width = w + 'px'; flag.style.height = h + 'px';
     flag.style.transform = 'translate(' + Math.round((innerWidth - w) / 2 + look.dx) + 'px,' + Math.round((innerHeight - h) / 2 + look.dy) + 'px) rotate(' + look.rot.toFixed(1) + 'deg) scaleX(' + look.flip + ')';
   }
