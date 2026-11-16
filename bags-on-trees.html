@@ -679,8 +679,11 @@
     .plus { font-size: 1.7rem; padding: 0.2rem 0.8rem 0.2rem 0; }
 
     /* Homepage + loader: bigger logotype that fills the width, text hugs the edges */
+    /* The title breaks onto three lines (Bags / on / trees): same tight letter spacing, tight line spacing, larger so it fills the width */
     .stage-home .big-title,
-    #loading-screen .loading-title { font-size: 17vw; }
+    #loading-screen .loading-title { font-size: 27vw; line-height: 0.74; white-space: normal; }
+    .stage-home .big-title .tw,
+    #loading-screen .loading-title .tw { display: block; }
     #page-flow { padding: 4.5rem 1.25rem 2rem; }
     .flow-stage { inset: 4.5rem 1.25rem 2rem; }
     .stage-home { padding-top: clamp(2rem, 9vh, 5rem); row-gap: 1.6rem; }
@@ -688,7 +691,8 @@
     .stage-home .blurb { font-size: 1rem; line-height: 1.38; }
     .stage-home .count-line { font-size: 0.95rem; margin-top: 0; }
     .stage-intro p { font-size: 1rem; margin-top: 12vh; }
-    .scroll-hint { bottom: 1.6rem; font-size: 0.85rem; }
+    .scroll-hint { bottom: 0.9rem; font-size: 0.8rem; }
+    .scroll-hint::after { height: 1.4rem; margin-top: .45rem; }
 
     /* Index: each row becomes two lines — tree + date, then address + time */
     #page-index .container { padding-top: 4.5rem; }
@@ -791,7 +795,7 @@
 
 <!-- LOADING SCREEN -->
 <div id="loading-screen">
-  <div class="loading-title">Bagsontrees</div>
+  <div class="loading-title"><span class="tw">Bags</span><span class="tw">on</span><span class="tw">trees</span></div>
   <div class="loading-caption" id="loading-caption">Mapping every tree in New York City</div>
   <div class="loading-dot"></div>
 </div>
@@ -833,7 +837,7 @@
   <div id="page-flow">
     <section class="flow-stage stage-home visible" data-stage="0" id="home-text">
       <div class="count-line" id="count-line">In this site current documentation of <span id="home-count">0</span> bags on trees</div>
-      <h1 class="big-title">Bagsontrees</h1>
+      <h1 class="big-title"><span class="tw">Bags</span><span class="tw">on</span><span class="tw">trees</span></h1>
       <div class="blurb-stack">
         <p class="blurb blurb-0 active">Winter Phenomenon is an ongoing archive of plastic bags, rubbish, and random leftovers caught in the naked trees of NYC, primarily during the winter, documenting a visual choreography of wind-curated waste.</p>
         <p class="blurb blurb-1">Every single dot on this screen represents a tree planted across New York City, all five boroughs, a living network mapped from open data.</p>
@@ -2873,6 +2877,17 @@ function alignTitleInk() {
     const cs = getComputedStyle(t);
     const c = document.createElement('canvas').getContext('2d');
     c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const words = t.querySelectorAll('.tw');
+    if (words.length && getComputedStyle(words[0]).display === 'block') {
+      // stacked title (phones): every line gets its own correction, so all three first letters sit on the same left edge
+      t.style.marginLeft = '0px';
+      words.forEach((w) => {
+        const mm = c.measureText((w.textContent || 'B').trim().charAt(0));
+        w.style.marginLeft = (mm.actualBoundingBoxLeft).toFixed(2) + 'px';
+      });
+      return;
+    }
+    words.forEach((w) => { w.style.marginLeft = ''; });
     const m = c.measureText((t.textContent || 'B').trim().charAt(0));
     const bearing = -m.actualBoundingBoxLeft;            // gap between the text box edge and the first letter's ink
     t.style.marginLeft = (-bearing).toFixed(2) + 'px';
