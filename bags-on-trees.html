@@ -710,7 +710,10 @@
     .stage-home .count-line .cl-a, .stage-home .count-line .cl-b { display: block; }
     /* the paragraphs read like an article: full column width, stacked, each one added under the last */
     .stage-home .blurb { position: static; max-width: none; margin: 0 0 1rem; font-size: 0.98rem; line-height: 1.42; opacity: 1; pointer-events: auto; transition: none; }
-    #home-text { will-change: transform; }
+    #home-text { will-change: opacity; }
+    /* title + sentence stay put and sit above the paragraphs; the paragraphs slide up underneath, blended like the text deeper in the site */
+    .stage-home .big-title, .stage-home .count-line { position: relative; z-index: 2; mix-blend-mode: multiply; }
+    .stage-home .blurb-stack { position: relative; z-index: 1; will-change: transform; }
     #page-flow::before { content:''; position: fixed; left:0; right:0; top:0; height: 5.2rem; background: linear-gradient(to bottom, #AAAAAA 0, #AAAAAA 70%, rgba(170,170,170,0) 100%); z-index: 5; pointer-events: none; }
 
     /* Scroll cue: just the light-blue dot, fixed at the bottom centre exactly where the loading dot sits.
@@ -2378,18 +2381,19 @@ setInterval(() => {
   const h = document.querySelector('.scroll-hint');
   if (h && h.classList.contains('show') && h.classList.contains('gone') && performance.now() - lastHintMove > 5000) h.classList.remove('gone');
 }, 500);
-let articleShift = 0;
+let articleShift = 0, pxPerUnit = 900;
 function layoutPhoneArticle() {
   if (window.innerWidth > 700) { articleShift = 0; return; }
   const hs = document.getElementById('home-text'), st = hs && hs.querySelector('.blurb-stack');
   if (!hs || !st) return;
-  const prevT = hs.style.transform; hs.style.transform = 'none'; st.style.marginTop = '0px';
+  const prevT = st.style.transform; st.style.transform = 'none'; st.style.marginTop = '0px';
   const top = hs.getBoundingClientRect().top + st.offsetTop;
   const mt = Math.max(16, window.innerHeight * 1.03 - top);   // paragraphs start just below the fold
   st.style.marginTop = mt + 'px';
   const bottom = top + mt + st.offsetHeight;
-  articleShift = Math.max(0, bottom - window.innerHeight * 0.86);
-  hs.style.transform = prevT;
+  articleShift = Math.max(0, bottom - window.innerHeight * 0.6);   // the last line comes to rest under the title
+  pxPerUnit = Math.max(500, articleShift / 0.85);
+  st.style.transform = prevT;
   if (typeof applyScrollProgress === 'function') applyScrollProgress();
 }
 window.addEventListener('resize', layoutPhoneArticle);
@@ -2440,12 +2444,9 @@ function applyScrollProgress() {
   if (bigTitleEl) bigTitleEl.style.opacity = groupOpacity;
   const phoneArticle = window.innerWidth <= 700;   // phones: the whole entrance is one article that scrolls up with your finger
   if (phoneArticle) {
-    const hs = document.getElementById('home-text');
-    if (hs) {
-      const p = Math.min(1, e / 0.85);
-      hs.style.transform = 'translate3d(0,' + (-articleShift * p).toFixed(1) + 'px,0)';
-      hs.style.opacity = groupOpacity;
-    }
+    const st = document.querySelector('.stage-home .blurb-stack');
+    if (st) st.style.transform = 'translate3d(0,' + (-articleShift * Math.min(1, e / 0.85)).toFixed(1) + 'px,0)';
+    const hs = document.getElementById('home-text'); if (hs) hs.style.opacity = groupOpacity;
     if (countLineEl) countLineEl.style.opacity = 1;
     if (bigTitleEl) bigTitleEl.style.opacity = 1;
   } else blurbEls.forEach((b, i) => {
@@ -2466,6 +2467,7 @@ function onFlowScroll(deltaY) {
   if (state.page !== 'flow') return;
   // Slower still — a long, gentle reveal that keeps text readable
   scrollProgress = Math.max(0, Math.min(1, scrollProgress + deltaY * 0.00034));
+  flowTarget = scrollProgress;
   applyScrollProgress();
 }
 
@@ -2483,23 +2485,45 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Touch scroll on flow page
-let touchY = null;
+// Touch scroll on flow page. Phones: the text follows the finger 1:1, lets go with momentum and eases into place
+let touchY = null, flowTarget = 0, flowVel = 0, lastTouchT = 0, flowRaf = 0, fingerDown = false;
+function flowLoop() {
+  flowRaf = 0;
+  if (state.page !== 'flow' || window.innerWidth > 700) return;
+  if (!fingerDown && Math.abs(flowVel) > 0.00002) {          // momentum after the finger lifts
+    flowTarget = Math.max(0, Math.min(1, flowTarget + flowVel * 16));
+    flowVel *= 0.94;
+  }
+  const k = fingerDown ? 0.45 : 0.16;
+  const d = flowTarget - scrollProgress;
+  scrollProgress = Math.abs(d) < 0.0002 ? flowTarget : scrollProgress + d * k;
+  applyScrollProgress();
+  if (fingerDown || Math.abs(d) > 0.0002 || Math.abs(flowVel) > 0.00002) flowRaf = requestAnimationFrame(flowLoop);
+}
+function kickFlow() { if (!flowRaf) flowRaf = requestAnimationFrame(flowLoop); }
 window.addEventListener('touchstart', (e) => {
-  if (state.page === 'flow') touchY = e.touches[0].clientY;
+  if (state.page !== 'flow') return;
+  touchY = e.touches[0].clientY; fingerDown = true; flowVel = 0; lastTouchT = performance.now(); flowTarget = scrollProgress;
 });
 window.addEventListener('touchmove', (e) => {
   if (state.page !== 'flow' || touchY == null) return;
   e.preventDefault();
-  const dy = touchY - e.touches[0].clientY;
-  touchY = e.touches[0].clientY;
-  onFlowScroll(dy * 3);
+  const y = e.touches[0].clientY, dy = touchY - y, now = performance.now();
+  touchY = y;
+  if (window.innerWidth <= 700) {
+    const du = dy / pxPerUnit;
+    flowTarget = Math.max(0, Math.min(1, flowTarget + du));
+    const dt = Math.max(1, now - lastTouchT); flowVel = flowVel * 0.6 + (du / dt) * 0.4; lastTouchT = now;
+    kickFlow();
+  } else onFlowScroll(dy * 3);
 }, { passive: false });
-window.addEventListener('touchend', () => { touchY = null; });
+function endTouch() { touchY = null; fingerDown = false; if (performance.now() - lastTouchT > 90) flowVel = 0; kickFlow(); }
+window.addEventListener('touchend', endTouch);
+window.addEventListener('touchcancel', endTouch);
 
 // Reset flow when returning to it from another page
 function resetFlow() {
-  scrollProgress = 0;
+  scrollProgress = 0; flowTarget = 0; flowVel = 0;
   applyScrollProgress();
   view.scale = INITIAL_ZOOM;
 }
