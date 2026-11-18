@@ -711,7 +711,7 @@
     /* the paragraphs read like an article: full column width, stacked, each one added under the last */
     .stage-home .blurb { position: static; max-width: none; margin: 0 0 1rem; font-size: 0.98rem; line-height: 1.42; opacity: 1; pointer-events: auto; transition: none; }
     #home-text { will-change: transform; }
-    #page-flow { -webkit-mask-image: linear-gradient(to bottom, transparent 3.6rem, #000 5rem); mask-image: linear-gradient(to bottom, transparent 3.6rem, #000 5rem); }
+    #page-flow::before { content:''; position: fixed; left:0; right:0; top:0; height: 5.2rem; background: linear-gradient(to bottom, #AAAAAA 0, #AAAAAA 70%, rgba(170,170,170,0) 100%); z-index: 5; pointer-events: none; }
 
     /* Scroll cue: just the light-blue dot, fixed at the bottom centre exactly where the loading dot sits.
        It glides smoothly upward from below, fades away at the top, then repeats */
