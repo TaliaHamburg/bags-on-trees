@@ -709,7 +709,9 @@
     .stage-home .blurb-stack { order: 3; margin-top: 1.2rem; max-width: none; width: 100%; }
     .stage-home .count-line .cl-a, .stage-home .count-line .cl-b { display: block; }
     /* the paragraphs read like an article: full column width, stacked, each one added under the last */
-    .stage-home .blurb { position: static; max-width: none; margin: 0 0 1rem; font-size: 0.98rem; line-height: 1.42; }
+    .stage-home .blurb { position: static; max-width: none; margin: 0 0 1rem; font-size: 0.98rem; line-height: 1.42; opacity: 1; pointer-events: auto; transition: none; }
+    #home-text { will-change: transform; }
+    #page-flow { -webkit-mask-image: linear-gradient(to bottom, transparent 3.6rem, #000 5rem); mask-image: linear-gradient(to bottom, transparent 3.6rem, #000 5rem); }
 
     /* Scroll cue: just the light-blue dot, fixed at the bottom centre exactly where the loading dot sits.
        It glides smoothly upward from below, fades away at the top, then repeats */
@@ -2376,6 +2378,22 @@ setInterval(() => {
   const h = document.querySelector('.scroll-hint');
   if (h && h.classList.contains('show') && h.classList.contains('gone') && performance.now() - lastHintMove > 5000) h.classList.remove('gone');
 }, 500);
+let articleShift = 0;
+function layoutPhoneArticle() {
+  if (window.innerWidth > 700) { articleShift = 0; return; }
+  const hs = document.getElementById('home-text'), st = hs && hs.querySelector('.blurb-stack');
+  if (!hs || !st) return;
+  const prevT = hs.style.transform; hs.style.transform = 'none'; st.style.marginTop = '0px';
+  const top = hs.getBoundingClientRect().top + st.offsetTop;
+  const mt = Math.max(16, window.innerHeight * 1.03 - top);   // paragraphs start just below the fold
+  st.style.marginTop = mt + 'px';
+  const bottom = top + mt + st.offsetHeight;
+  articleShift = Math.max(0, bottom - window.innerHeight * 0.86);
+  hs.style.transform = prevT;
+  if (typeof applyScrollProgress === 'function') applyScrollProgress();
+}
+window.addEventListener('resize', layoutPhoneArticle);
+window.addEventListener('load', () => { layoutPhoneArticle(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutPhoneArticle); });
 function applyScrollProgress() {
   const e = scrollProgress;
   const hintEl = document.querySelector('.scroll-hint'); if (hintEl) hintEl.classList.toggle('gone', e > 0.03);   // the cue goes away on the first scroll
@@ -2420,10 +2438,18 @@ function applyScrollProgress() {
 
   if (countLineEl) countLineEl.style.opacity = groupOpacity;
   if (bigTitleEl) bigTitleEl.style.opacity = groupOpacity;
-  const phoneArticle = window.innerWidth <= 700;   // phones: every paragraph already shown stays on the page
-  blurbEls.forEach((b, i) => {
-    const on = phoneArticle ? i <= activeIdx : i === activeIdx;
-    if (phoneArticle) b.classList.toggle('active', on);
+  const phoneArticle = window.innerWidth <= 700;   // phones: the whole entrance is one article that scrolls up with your finger
+  if (phoneArticle) {
+    const hs = document.getElementById('home-text');
+    if (hs) {
+      const p = Math.min(1, e / 0.85);
+      hs.style.transform = 'translate3d(0,' + (-articleShift * p).toFixed(1) + 'px,0)';
+      hs.style.opacity = groupOpacity;
+    }
+    if (countLineEl) countLineEl.style.opacity = 1;
+    if (bigTitleEl) bigTitleEl.style.opacity = 1;
+  } else blurbEls.forEach((b, i) => {
+    const on = i === activeIdx;
     b.style.opacity = on ? groupOpacity : '';
   });
 
