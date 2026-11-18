@@ -291,8 +291,9 @@
     margin-bottom: 0;
   }
 
-  /* Scroll hint */
+  /* Scroll hint — computer: removed; shown on phones only (see the phone block) */
   .scroll-hint {
+    display: none;
     position: fixed;
     bottom: 2rem;
     left: 50%;
@@ -641,6 +642,7 @@
     transition: opacity 0.4s ease;
   }
   #loading-screen.settling .loading-caption { opacity: 0; }
+  @media (min-width: 701px) { #loading-screen .loading-caption { display: none; } }   /* computer: no line of text on the opening screen */
   #loading-screen .loading-dot {
     position: absolute;
     bottom: clamp(4rem, 14vh, 10rem);
@@ -712,6 +714,7 @@
     /* Scroll cue: just the light-blue dot, fixed at the bottom centre exactly where the loading dot sits.
        It glides smoothly upward from below, fades away at the top, then repeats */
     .scroll-hint {
+      display: block;
       left: 50%; top: auto; bottom: clamp(4rem, 14vh, 10rem); transform: translateX(-50%);
       font-size: 0; line-height: 0; color: transparent;
     }
@@ -1084,13 +1087,16 @@ function blockToEntry(block) {
 // the moment it is added to Are.na. The last good copy is kept as a fallback.
 async function fetchArena() {
   const PER = 100;
+  const snapPromise = fetch(DATA.bagsSnapshot + '?_=' + Math.floor(Date.now() / 60000), { cache: 'no-cache' })   // asked at the same time as Are.na
+    .then(r => (r.ok ? r.json() : null)).catch(() => null);
+  const snapOrTimeout = () => Promise.race([snapPromise, new Promise(r => setTimeout(() => r(null), 4000))]);   // never hold the page up for the copy
   try {
     const entries = [];
     const incomplete = [];
     let total = 0;
     for (let page = 1; page <= 30; page++) {
       const res = await fetch(
-        `https://api.are.na/v2/channels/${ARENA_SLUG}/contents?per=${PER}&page=${page}`,
+        `https://api.are.na/v2/channels/${ARENA_SLUG}/contents?per=${PER}&page=${page}&_=${Date.now()}`,
         { priority: 'high', cache: 'no-cache' });   // always ask Are.na for the latest
       if (!res.ok) throw new Error(`Arena HTTP ${res.status}`);
       const data = await res.json();
@@ -1106,6 +1112,13 @@ async function fetchArena() {
       if (typeof data.length === 'number' && total >= data.length) break;
     }
     if (!entries.length) throw new Error('Arena returned no usable bags');
+    try {   // Are.na's own cache can lag behind: add any bag the saved copy (refreshed every 3 h) has that this answer lacks
+      const blocks = await snapOrTimeout();
+      if (Array.isArray(blocks)) {
+        const have = new Set(entries.map(e => e.id));
+        for (const b of blocks) { const e = have.has(b.id) ? null : blockToEntry(b); if (e) { entries.push(e); have.add(e.id); } }
+      }
+    } catch (_) {}
     console.log(`[arena] Loaded ${entries.length}/${total} blocks`);
     handleIncompleteUploads(incomplete);
     try {
@@ -1117,9 +1130,8 @@ async function fetchArena() {
     console.error('[arena] Fetch failed:', e.message);
     window.__arenaProblem = e.message;
     try {   // Are.na didn't answer: use the copy saved in the repo (refreshed every 3 hours)
-      const snap = await fetch(DATA.bagsSnapshot, { cache: 'no-cache' });
-      if (snap.ok) {
-        const blocks = await snap.json();
+      const blocks = await snapOrTimeout();
+      if (Array.isArray(blocks)) {
         const fromSnap = blocks.map(blockToEntry).filter(Boolean);
         if (fromSnap.length) {
           console.warn(`[arena] Using the repo snapshot (${fromSnap.length} bags)`);
