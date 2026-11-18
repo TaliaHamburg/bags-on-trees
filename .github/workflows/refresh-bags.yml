@@ -1,0 +1,26 @@
+# Saves a copy of the Are.na channel (bags.json) every 3 hours. The page uses it only when it cannot reach Are.na itself.
+# Run it by hand any time: Actions tab > "Refresh bags snapshot" > Run workflow.
+name: Refresh bags snapshot
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch Are.na
+        run: node build-bags.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "bags-snapshot-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add bags.json
+          git diff --cached --quiet || (git commit -m "Refresh bags snapshot $(date -u +%Y-%m-%dT%H:%MZ)" && git push)

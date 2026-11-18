@@ -114,6 +114,7 @@
     margin-bottom: 0.4rem;
     color: var(--ink);
   }
+  #plus-tooltip .pt-actions { display: none; }
   #plus-tooltip .pt-body {
     font-family: var(--font-serif);
     font-size: 0.9rem;
@@ -661,13 +662,22 @@
      TOUCH DEVICES — no hover, no custom cursor
      ────────────────────────────────────────────────────────────── */
   @media (hover: none) {
-    .cursor, #plus-tooltip { display: none !important; }
+    .cursor { display: none !important; }
   }
   /* Phones: the full-screen blended texture is skipped (lighter and smoother); the flat grey is set to match the textured look on the computer */
   @media (hover: none), (max-width: 700px) {
     :root { --bg: #AAAAAA; }
+    html { background: #AAAAAA; }
     body::after { display: none; }
+    /* one flat grey on every surface (no grain), the same on the loader, the intro and all pages */
+    body, #page-map, #page-index, #page-grid, #loading-screen, nav.top.page-nav, #page-flow, .stage-home { background-color: #AAAAAA; background-image: none; }
     .bloom-card, #plus-tooltip { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+    /* "+" on a phone: tapping opens this card first, with a button that continues to Are.na */
+    #plus-tooltip { left: 1.25rem !important; right: 1.25rem; top: 4.6rem !important; width: auto; padding: 1rem 1.25rem 1.1rem; pointer-events: none; z-index: 400; }
+    #plus-tooltip.visible { pointer-events: auto; }
+    #plus-tooltip .pt-actions { display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.9rem; font-family: var(--font-sans); font-size: 0.95rem; }
+    #plus-tooltip .pt-go { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+    #plus-tooltip .pt-close { background: none; border: none; padding: 0; font: inherit; color: var(--ink); cursor: pointer; }
   }
 
   /* ──────────────────────────────────────────────────────────────
@@ -694,14 +704,15 @@
     .stage-home { row-gap: 0.9rem; }
     .stage-home .big-title { order: 1; }
     .stage-home .count-line { order: 2; }
-    .stage-home .blurb-stack { order: 3; margin-top: 1.1rem; max-width: 15em; }
+    .stage-home .blurb-stack { order: 3; margin-top: 1.2rem; max-width: none; width: 100%; }
     .stage-home .count-line .cl-a, .stage-home .count-line .cl-b { display: block; }
-    .stage-home .blurb { max-width: 15em; }
+    /* the paragraphs read like an article: full column width, stacked, each one added under the last */
+    .stage-home .blurb { position: static; max-width: none; margin: 0 0 1rem; font-size: 0.98rem; line-height: 1.42; }
 
-    /* Scroll cue: just the light-blue dot (same size and colour as the loading dot), sitting where the paragraphs appear.
+    /* Scroll cue: just the light-blue dot, fixed at the bottom centre exactly where the loading dot sits.
        It glides smoothly upward from below, fades away at the top, then repeats */
     .scroll-hint {
-      left: var(--hint-left, 1.25rem); top: var(--hint-top, 60vh); bottom: auto; transform: none;
+      left: 50%; top: auto; bottom: clamp(4rem, 14vh, 10rem); transform: translateX(-50%);
       font-size: 0; line-height: 0; color: transparent;
     }
     .scroll-hint.show { animation: none; opacity: 1; }
@@ -839,6 +850,7 @@
 <div id="plus-tooltip">
   <div class="pt-title">Add to the Collection</div>
   <div class="pt-body">You are heading to Are.na. To contribute, upload your video of a bag on a tree anywhere in NYC.<br>Please include the date, time, and address. Thank you for helping document the wild things happening in our canopy.</div>
+  <div class="pt-actions"><a class="pt-go" href="https://www.are.na/talia-hamburg/bags-on-trees" target="_blank" rel="noopener">Continue to Are.na</a><button class="pt-close" type="button">Close</button></div>
 </div>
 
 <!-- GLOBAL TOP NAV (visible on Map; hidden during initial flow and on Index/Grid which have their own) -->
@@ -1093,6 +1105,7 @@ async function fetchArena() {
       if (data.contents.length < PER) break;
       if (typeof data.length === 'number' && total >= data.length) break;
     }
+    if (!entries.length) throw new Error('Arena returned no usable bags');
     console.log(`[arena] Loaded ${entries.length}/${total} blocks`);
     handleIncompleteUploads(incomplete);
     try {
@@ -1102,6 +1115,19 @@ async function fetchArena() {
     return entries;
   } catch (e) {
     console.error('[arena] Fetch failed:', e.message);
+    window.__arenaProblem = e.message;
+    try {   // Are.na didn't answer: use the copy saved in the repo (refreshed every 3 hours)
+      const snap = await fetch(DATA.bagsSnapshot, { cache: 'no-cache' });
+      if (snap.ok) {
+        const blocks = await snap.json();
+        const fromSnap = blocks.map(blockToEntry).filter(Boolean);
+        if (fromSnap.length) {
+          console.warn(`[arena] Using the repo snapshot (${fromSnap.length} bags)`);
+          window.__arenaProblem = null;
+          return fromSnap;
+        }
+      }
+    } catch (_) {}
     try {
       const cached = JSON.parse(localStorage.getItem(ARENA_CACHE_KEY) || 'null');
       if (Array.isArray(cached) && cached.length) {
@@ -1137,6 +1163,7 @@ const TREE_FIELDS = 'latitude,longitude,spc_common,spc_latin,address,zipcode,zip
 const DATA = {
   treesBin:       'https://cdn.jsdelivr.net/gh/TaliaHamburg/bags-on-trees@main/trees.bin',
   treesSpecies:   'https://cdn.jsdelivr.net/gh/TaliaHamburg/bags-on-trees@main/trees-species.json',
+  bagsSnapshot:   'https://raw.githubusercontent.com/TaliaHamburg/bags-on-trees/main/bags.json',   // copy of the Are.na channel (refreshed every 3 h) used only if Are.na can't be reached
   treesAddresses: 'https://cdn.jsdelivr.net/gh/TaliaHamburg/bags-on-trees@main/trees-addresses.txt',  // optional — street addresses on tree hover cards. '' to skip.
   version:        '2026-11-16',             // change this when you upload new files
   maxAgeDays:     90,                     // visitors' browsers re-download after this long regardless
@@ -2351,21 +2378,21 @@ function applyScrollProgress() {
   // text stays fully visible until the final band, then everything fades.
   let activeIdx;
   if (window.innerWidth <= 700) {
-    // phones: the entrance is just the title and its sentence; the paragraphs pop up one at a time as you keep scrolling
+    // phones: the entrance is just the title and its sentence; the paragraphs are added one after another, like an article
     if (e < 0.1) activeIdx = -1;
-    else if (e < 0.4) activeIdx = 0;
-    else if (e < 0.7) activeIdx = 1;
+    else if (e < 0.32) activeIdx = 0;
+    else if (e < 0.54) activeIdx = 1;
     else activeIdx = 2;
   } else if (e < 0.34) activeIdx = 0;
   else if (e < 0.68) activeIdx = 1;
   else activeIdx = 2;
-  setActiveBlurb(activeIdx);
+  if (window.innerWidth > 700) setActiveBlurb(activeIdx);
 
   // Dots: hold at 50% until the third sentence appears (e >= 0.68),
   // then ramp from 50% → 100% across the remaining scroll.
   if (window.innerWidth <= 700) {
     // phones: no dots while the text is being read; they fade in as the last paragraph finishes
-    dotOpacityScroll = e < 0.7 ? 0 : Math.min(1, (e - 0.7) / 0.3);
+    dotOpacityScroll = e < 0.8 ? 0 : Math.min(1, (e - 0.8) / 0.2);
   } else if (e < 0.68) {
     dotOpacityScroll = 0.5;
   } else {
@@ -2381,9 +2408,11 @@ function applyScrollProgress() {
 
   if (countLineEl) countLineEl.style.opacity = groupOpacity;
   if (bigTitleEl) bigTitleEl.style.opacity = groupOpacity;
+  const phoneArticle = window.innerWidth <= 700;   // phones: every paragraph already shown stays on the page
   blurbEls.forEach((b, i) => {
-    if (i === activeIdx) b.style.opacity = groupOpacity;
-    else b.style.opacity = '';
+    const on = phoneArticle ? i <= activeIdx : i === activeIdx;
+    if (phoneArticle) b.classList.toggle('active', on);
+    b.style.opacity = on ? groupOpacity : '';
   });
 
   if (e >= 0.999 && state.page === 'flow') {
@@ -2826,8 +2855,8 @@ function positionLoaderTitle() {
 
 // The homepage number counts up only once the loading page is gone and the site is actually in view
 let homeCountStarted = false;
-function placeScrollHint() {   // phones: put "swipe up" exactly where the paragraphs appear
-  if (window.innerWidth > 700) return;
+function placeScrollHint() {   // (the cue now stays fixed at the bottom centre, so there is nothing to place)
+  return;
   const h = document.querySelector('.scroll-hint'), bs = document.querySelector('.stage-home .blurb-stack');
   if (!h || !bs) return;
   const r = bs.getBoundingClientRect();
@@ -2884,6 +2913,12 @@ async function init() {
   });
 
   state.entries = await arenaPromise;
+  if (!state.entries.length) {   // say so on the page instead of leaving it silently empty
+    const n = document.createElement('div');
+    n.style.cssText = 'position:fixed;left:1.25rem;right:1.25rem;bottom:1rem;z-index:500;font:0.8rem var(--font-sans);color:#000;opacity:.7';
+    n.textContent = 'Could not load the bags' + (window.__arenaProblem ? ' (' + window.__arenaProblem + ')' : '') + '. Reload to try again.';
+    document.body.appendChild(n);
+  }
   state.entries.sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
 
   state.blooms = state.entries.map((entry, i) => new Bloom(entry, i));
@@ -2944,16 +2979,31 @@ function assetsReady() {
 
 
 /* Nudge the big homepage title so the ink of its first letter (not its text box) lines up with the "+" */
-function fitPhoneTitle() {   // phones: the title is as wide as the page allows, edge to edge between the 1.25rem side margins
+function titleInkWidthAt100(t) {   // the real painted width of the title at 100px (letters + tight letter-spacing), measured from pixels
+  const cs = getComputedStyle(t), text = (t.textContent || '').trim();
+  const cv = document.createElement('canvas'); cv.width = 1600; cv.height = 260;
+  const c = cv.getContext('2d', { willReadFrequently: true });
+  c.font = `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`;
+  c.textBaseline = 'alphabetic'; c.fillStyle = '#000';
+  const ls = -0.14 * 100;
+  if ('letterSpacing' in c) { c.letterSpacing = ls + 'px'; c.fillText(text, 100, 180); }
+  else { let x = 100; for (const ch of text) { c.fillText(ch, x, 180); x += c.measureText(ch).width + ls; } }
+  const d = c.getImageData(0, 0, cv.width, cv.height).data;
+  let minX = cv.width, maxX = -1;
+  for (let x = 0; x < cv.width; x++) for (let y = 0; y < cv.height; y += 2) if (d[(y * cv.width + x) * 4 + 3] > 60) { if (x < minX) minX = x; if (x > maxX) maxX = x; break; }
+  return maxX > minX ? maxX - minX + 1 : 0;
+}
+function fitPhoneTitle() {   // phones: the title's ink is as wide as the page allows, edge to edge between the 1.25rem side margins
   const root = document.documentElement, t = document.querySelector('.stage-home .big-title');
   if (!t) return;
   if (window.innerWidth > 700) { root.style.removeProperty('--title-fs'); return; }
-  root.style.setProperty('--title-fs', '100px');
-  const r = document.createRange(); r.selectNodeContents(t);
-  const w100 = r.getBoundingClientRect().width;      // the box edge sits at the last letter's ink
-  const margin = parseFloat(getComputedStyle(root).fontSize) * 1.25;
-  const size = Math.min(130, (window.innerWidth - 2 * margin) / w100 * 100);
-  root.style.setProperty('--title-fs', size.toFixed(2) + 'px');
+  try {
+    const w100 = titleInkWidthAt100(t);
+    if (!w100) return;
+    const margin = parseFloat(getComputedStyle(root).fontSize) * 1.25;
+    const size = Math.min(130, (window.innerWidth - 2 * margin) / w100 * 100 * 0.995);
+    root.style.setProperty('--title-fs', size.toFixed(2) + 'px');
+  } catch (e) {}
 }
 function alignTitleInk() {
   fitPhoneTitle();
@@ -3012,8 +3062,24 @@ window.addEventListener('focus', () => {
 
 // "+" hover tooltip
 const plusTooltip = document.getElementById('plus-tooltip');
+const PHONE_UI = () => window.matchMedia('(hover: none), (max-width: 700px)').matches;
+document.querySelectorAll('.plus').forEach(p => {
+  p.addEventListener('click', (ev) => {   // phones: show the card first, only then go to Are.na (the card's button)
+    if (!PHONE_UI()) return;
+    ev.preventDefault();
+    const r = p.getBoundingClientRect();
+    plusTooltip.classList.toggle('visible');
+    setTimeout(() => document.querySelectorAll('.plus').forEach(x => x.classList.remove('chosen')), 0);   // not 'chosen' until they continue
+  });
+});
+plusTooltip.querySelector('.pt-close').addEventListener('click', () => plusTooltip.classList.remove('visible'));
+plusTooltip.querySelector('.pt-go').addEventListener('click', () => plusTooltip.classList.remove('visible'));
+document.addEventListener('pointerdown', (ev) => {
+  if (PHONE_UI() && plusTooltip.classList.contains('visible') && !plusTooltip.contains(ev.target) && !ev.target.closest('.plus')) plusTooltip.classList.remove('visible');
+});
 document.querySelectorAll('.plus').forEach(p => {
   p.addEventListener('mouseenter', () => {
+    if (PHONE_UI()) return;
     if (state.page === 'grid') return;
     const r = p.getBoundingClientRect();
     plusTooltip.style.left = r.left + 'px';
@@ -3021,6 +3087,7 @@ document.querySelectorAll('.plus').forEach(p => {
     plusTooltip.classList.add('visible');
   });
   p.addEventListener('mouseleave', () => {
+    if (PHONE_UI()) return;
     plusTooltip.classList.remove('visible');
   });
 });
