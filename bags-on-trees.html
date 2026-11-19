@@ -1969,6 +1969,8 @@ function loop(t = 0) {
   // phones: the map is redrawn every other frame (the motion still updates every frame), which halves the work
   if (LITE && (frameN++ & 1)) { requestAnimationFrame(loop); return; }
 
+  // a bag video is covering the map (the canvas is hidden behind it): skip the redraw so the video gets the whole frame budget
+  if (pageMap.classList.contains('video-active')) { requestAnimationFrame(loop); return; }
   ctx.clearRect(0, 0, W, H);
   const px = (view.mouseX / W - 0.5) * 20;
   const py = (view.mouseY / H - 0.5) * 20;
