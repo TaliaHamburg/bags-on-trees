@@ -2983,7 +2983,9 @@ function dismissLoading() {
 async function init() {
   if (document.documentElement.classList.contains('hold')) {   // phones: nothing is downloaded, only the title + flag shadow
     const h = document.querySelector('#hold h1'), fit = () => {
-      try { const w = titleInkWidthAt100(h); if (w) document.documentElement.style.setProperty('--title-fs', Math.min(130, (innerWidth - 40) / w * 100 * 0.995).toFixed(2) + 'px'); } catch (e) {} };
+      try { const w = titleInkWidthAt100(h); if (w) { const fs = Math.min(130, (innerWidth - 40) / w * 100 * 0.995);
+        document.documentElement.style.setProperty('--title-fs', fs.toFixed(2) + 'px');
+        h.style.marginLeft = (-(window.__inkLeft100 || 0) / 100 * fs).toFixed(2) + 'px'; } } catch (e) {} };   // the first letter's ink starts exactly on the same left edge as the line under it
     (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(fit); addEventListener('resize', fit);
     setTimeout(() => window.__showFlag && window.__showFlag(), 400);
     return;
@@ -3080,6 +3082,7 @@ function titleInkWidthAt100(t) {   // the real painted width of the title at 100
   const d = c.getImageData(0, 0, cv.width, cv.height).data;
   let minX = cv.width, maxX = -1;
   for (let x = 0; x < cv.width; x++) for (let y = 0; y < cv.height; y += 2) if (d[(y * cv.width + x) * 4 + 3] > 60) { if (x < minX) minX = x; if (x > maxX) maxX = x; break; }
+  window.__inkLeft100 = minX < cv.width ? minX - 100 : 0;   // how far the first letter's ink starts right of the text origin, at 100px
   return maxX > minX ? maxX - minX + 1 : 0;
 }
 function fitPhoneTitle() {   // phones: the title's ink is as wide as the page allows, edge to edge between the 1.25rem side margins
