@@ -3640,7 +3640,7 @@ document.querySelectorAll('.plus').forEach(p => {
         o = row + xx; k = srow + (xx >> 2);
         fx = Math.min(xx, RW - 1 - xx) / (RW * 0.14); fy = Math.min(yy, RH - 1 - yy) / (RH * 0.08); fx = fx < fy ? fx : fy;
         if (fx > 1) fx = 1; fx = fx * fx * (3 - 2 * fx);                           // the shadow fades out before the canvas edge, so it is never cut off
-        sa = (0.2 * M1[k] + 0.1 * M2[k]) * 1.8 * fx;                             // how dark the shadow is here
+        sa = (0.2 * M1[k] + 0.1 * M2[k]) * 2.16 * fx;                           // how dark the shadow is here (strength +20%)
         nn = (G1[gyA | ((xx + gx) & 255)] * 0.62 + G2[gyB | (((xx >> 1) + gx2) & 255)] * 0.38) * 0.007843 - 1;
         if (zb[o] > -1e8) {
           /* the film is drawn at FILM_OP opacity over its cast shadow, and the shadow keeps its full strength (it is also seen through the film) */
