@@ -19,7 +19,7 @@
 (function () {
   var phone = Math.min(screen.width, screen.height) <= 700;   /* the device itself is a phone (not the window or an embed frame, whose width can be small while loading) */
   if (phone && !/[?&]mobile=1\b/.test(location.search)) document.documentElement.classList.add('hold');
-  if (/[?&]hold=1\b/.test(location.search)) document.documentElement.classList.add('hold');   // used by the thumbnail on the portfolio's phone page
+  if (/[?&]hold=1\b/.test(location.search)) document.documentElement.classList.add('hold', 'cover');   // used by the thumbnail on the portfolio's phone page
 })();
 </script>
 <style>
@@ -853,6 +853,7 @@
   html.hold, html.hold body { background: #AAAAAA; overflow: hidden; }
   html.hold #hold { display: flex; position: fixed; inset: 0; z-index: 300; flex-direction: column; justify-content: center; padding: 0 1.25rem; pointer-events: none; }
   #hold h1 { font-family: var(--font-sans); font-weight: 500; font-size: var(--title-fs, 17vw); line-height: .85; letter-spacing: -0.14em; margin: 0; white-space: nowrap; color: var(--ink); }
+  html.cover #hold p { display: none; }   /* thumbnail on the portfolio: the title only */
   #hold p { font-family: var(--font-serif); font-size: 1rem; line-height: 1.4; margin: 1rem 0 0; color: var(--ink); }
 </style>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
