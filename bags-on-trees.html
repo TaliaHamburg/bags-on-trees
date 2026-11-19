@@ -17,7 +17,7 @@
 <script>
 /* Phones are held back for now: they get only the title, the flag shadow and a short note. Preview the full phone version with ?mobile=1 */
 (function () {
-  var phone = Math.min(screen.width, innerWidth) <= 700 || (matchMedia('(hover: none) and (pointer: coarse)').matches && innerWidth <= 900);
+  var phone = Math.min(screen.width, screen.height) <= 700;   /* the device itself is a phone (not the window or an embed frame, whose width can be small while loading) */
   if (phone && !/[?&]mobile=1\b/.test(location.search)) document.documentElement.classList.add('hold');
 })();
 </script>
