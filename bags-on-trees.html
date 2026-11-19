@@ -14,6 +14,13 @@
 <link rel="dns-prefetch" href="https://attachments.are.na">
 <link rel="dns-prefetch" href="https://images.are.na">
 <link href="https://api.fontshare.com/v2/css?f[]=switzer@300,400,500,600&f[]=gambarino@400&display=swap" rel="stylesheet">
+<script>
+/* Phones are held back for now: they get only the title, the flag shadow and a short note. Preview the full phone version with ?mobile=1 */
+(function () {
+  var phone = Math.min(screen.width, innerWidth) <= 700 || (matchMedia('(hover: none) and (pointer: coarse)').matches && innerWidth <= 900);
+  if (phone && !/[?&]mobile=1\b/.test(location.search)) document.documentElement.classList.add('hold');
+})();
+</script>
 <style>
   :root {
     --bg: #AAAAAA;
@@ -839,12 +846,21 @@
   }
   #flag.off { display: none; }
   #flag canvas { display: block; width: 100%; height: 100%; background: transparent; }
+  /* ── PHONE HOLD SCREEN (desktop-only for now) ── */
+  #hold { display: none; }
+  html.hold body > *:not(#hold):not(#flag):not(script) { display: none !important; }
+  html.hold, html.hold body { background: #AAAAAA; overflow: hidden; }
+  html.hold #hold { display: flex; position: fixed; inset: 0; z-index: 300; flex-direction: column; justify-content: center; padding: 0 1.25rem; pointer-events: none; }
+  #hold h1 { font-family: var(--font-sans); font-weight: 500; font-size: var(--title-fs, 17vw); line-height: .85; letter-spacing: -0.14em; margin: 0; white-space: nowrap; color: var(--ink); }
+  #hold p { font-family: var(--font-serif); font-size: 1rem; line-height: 1.4; margin: 1rem 0 0; color: var(--ink); }
 </style>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 </head>
 <body>
 
 <!-- LOADING SCREEN -->
+<div id="hold"><h1><span class="tw">Bags</span><span class="tw">on</span><span class="tw">trees</span></h1><p>This site is available on desktop for now.<br>Open it on a computer.</p></div>
+
 <div id="loading-screen">
   <div class="loading-title"><span class="tw">Bags</span><span class="tw">on</span><span class="tw">trees</span></div>
   <div class="loading-caption" id="loading-caption">Mapping every tree in New York City</div>
@@ -2961,6 +2977,13 @@ function dismissLoading() {
 }
 
 async function init() {
+  if (document.documentElement.classList.contains('hold')) {   // phones: nothing is downloaded, only the title + flag shadow
+    const h = document.querySelector('#hold h1'), fit = () => {
+      try { const w = titleInkWidthAt100(h); if (w) document.documentElement.style.setProperty('--title-fs', Math.min(130, (innerWidth - 40) / w * 100 * 0.995).toFixed(2) + 'px'); } catch (e) {} };
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(fit); addEventListener('resize', fit);
+    setTimeout(() => window.__showFlag && window.__showFlag(), 400);
+    return;
+  }
   const arenaPromise = fetchArena();
   const treesPromise = tryLoadBinaryTrees();   // start both downloads together
   loop();
@@ -3715,6 +3738,7 @@ document.querySelectorAll('.plus').forEach(p => {
   }
   function show() { clearTimeout(hideT); reroll(); newPalette(); place(); flag.classList.remove('off'); void flag.offsetWidth; flag.style.opacity = 1; }
   function hide() { flag.style.opacity = 0; hideT = setTimeout(function () { flag.classList.add('off'); }, 950); }
+  window.__showFlag = show;
   document.querySelectorAll('.plus').forEach(function (p) { p.addEventListener('mouseenter', show); p.addEventListener('mouseleave', hide); });
   addEventListener('resize', function () { if (!flag.classList.contains('off')) place(); });
 })();
