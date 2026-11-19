@@ -19,6 +19,7 @@
 (function () {
   var phone = Math.min(screen.width, screen.height) <= 700;   /* the device itself is a phone (not the window or an embed frame, whose width can be small while loading) */
   if (phone && !/[?&]mobile=1\b/.test(location.search)) document.documentElement.classList.add('hold');
+  if (/[?&]hold=1\b/.test(location.search)) document.documentElement.classList.add('hold');   // used by the thumbnail on the portfolio's phone page
 })();
 </script>
 <style>
