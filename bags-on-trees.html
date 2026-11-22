@@ -19,10 +19,10 @@
 <link rel="dns-prefetch" href="https://images.are.na">
 <link href="https://api.fontshare.com/v2/css?f[]=switzer@300,400,500,600&f[]=gambarino@400&display=swap" rel="stylesheet">
 <script>
-/* Phones are held back for now: they get only the title, the flag shadow and a short note. Preview the full phone version with ?mobile=1 */
+/* Phones get the full site. The holding screen (title, flag shadow, short note) now only shows with ?hold=1 */
 (function () {
   var phone = Math.min(screen.width, screen.height) <= 700;   /* the device itself is a phone (not the window or an embed frame, whose width can be small while loading) */
-  if (phone && !/[?&]mobile=1\b/.test(location.search)) document.documentElement.classList.add('hold');
+  /* the full phone version is live: phones no longer get the holding screen (it stays for ?hold=1, the thumbnail on the portfolio's phone page) */
   if (/[?&]hold=1\b/.test(location.search)) document.documentElement.classList.add('hold', 'cover');   // used by the thumbnail on the portfolio's phone page
 })();
 </script>
