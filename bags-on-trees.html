@@ -1877,12 +1877,13 @@ class Bloom {
   draw(t, scale) {
     let { x, y } = this.screenPos();
     if (x < -300 || x > W + 300 || y < -300 || y > H + 300) return;
-    const time = t * 0.0009;
-    const swayX = Math.sin(time + this.seed * 0.3) * 2.4 + Math.sin(time * 2.1 + this.seed) * 0.8;
-    const swayY = Math.cos(time * 0.85 + this.seed * 0.5) * 2.0 + Math.cos(time * 1.7 + this.seed * 2) * 0.6;
+    const time = t * (LITE ? 0.0006 : 0.0009), sa = LITE ? 1.6 : 1;
+    const swayX = (Math.sin(time + this.seed * 0.3) * 2.4 + Math.sin(time * 2.1 + this.seed) * 0.8) * sa;
+    const swayY = (Math.cos(time * 0.85 + this.seed * 0.5) * 2.0 + Math.cos(time * 1.7 + this.seed * 2) * 0.6) * sa;
     x += swayX; y += swayY;
     this._lastDrawX = x; this._lastDrawY = y;
-    const baseR = 2.85;
+    // phones: bigger, and the dark dots breathe (grow and shrink slowly) so they read as different from the rest
+    const baseR = LITE ? 4.6 * (1 + 0.22 * Math.sin(t * 0.0028 + this.seed)) : 2.85;
     const targetGrow = (currentHoverBloom === this) ? 2 : 0;
     this._growth = (this._growth ?? 0) + (targetGrow - (this._growth ?? 0)) * 0.18;
     const dotR = baseR + this._growth;
@@ -1937,7 +1938,9 @@ function introProgress(t) {
   return Math.min(1, (t - introStart) / INTRO_DURATION);
 }
 
+let flingVX = 0, flingVY = 0, lastLoopT = 0;   // phones: the map keeps gliding a little after a flick
 function loop(t = 0) {
+  const dtL = Math.min(50, Math.max(0, t - (lastLoopT || t))); lastLoopT = t;
   if (state.page === 'grid' || state.page === 'index') { requestAnimationFrame(loop); return; }   // nothing to draw behind these pages
   // Edge-panning: when cursor nears a screen edge on the map page (and not dragging),
   // continuously pan the view in that direction.
@@ -1970,10 +1973,17 @@ function loop(t = 0) {
   // Keep the view within the trees' bounding box (+ margin) — stop panning into the void
   if (state.page === 'map') clampViewTarget();
 
-  // Slower lerp = smoother, more cinematic transitions
-  view.x += (view.targetX - view.x) * 0.05;
-  view.y += (view.targetY - view.y) * 0.05;
-  view.scale += (view.targetScale - view.scale) * 0.05;
+  // phones: after a flick the map glides on and slows down smoothly
+  if (LITE && state.page === 'map' && !touchGesture && (flingVX || flingVY)) {
+    view.targetX += flingVX * dtL; view.targetY += flingVY * dtL;
+    const dec = Math.exp(-dtL / 380); flingVX *= dec; flingVY *= dec;
+    if (Math.abs(flingVX) < 1e-4 && Math.abs(flingVY) < 1e-4) flingVX = flingVY = 0;
+  }
+  // Slower lerp = smoother, more cinematic transitions (phones follow the finger faster)
+  const KP = LITE ? 0.2 : 0.05, KZ = LITE ? 0.16 : 0.05;
+  view.x += (view.targetX - view.x) * KP;
+  view.y += (view.targetY - view.y) * KP;
+  view.scale += (view.targetScale - view.scale) * KZ;
 
   const intro = introProgress(t);
   const eased = 1 - Math.pow(1 - intro, 3);
@@ -2021,14 +2031,14 @@ function loop(t = 0) {
       }
     }
     const byColor = visByColor;
-    const dotR = 2.85;
+    const dotR = LITE ? 4.2 : 2.85;   // phones: larger dots
     // Every tree breathes a little (the bag trees sway more). 256 phase slots are recomputed once per frame;
     // each tree picks one by position, so it costs almost nothing across hundreds of thousands of dots.
-    const tm = t * 0.0009;
+    const tm = t * (LITE ? 0.0006 : 0.0009), SA = LITE ? 1.7 : 1;   // phones: slower and larger sway
     for (let i = 0; i < 256; i++) {
       const ph = i * 2.399963;
-      SWAY_X[i] = Math.sin(tm + ph) * 1.0 + Math.sin(tm * 2.1 + ph * 1.7) * 0.35;
-      SWAY_Y[i] = Math.cos(tm * 0.85 + ph * 0.6) * 0.9 + Math.cos(tm * 1.7 + ph * 2.3) * 0.3;
+      SWAY_X[i] = (Math.sin(tm + ph) * 1.0 + Math.sin(tm * 2.1 + ph * 1.7) * 0.35) * SA;
+      SWAY_Y[i] = (Math.cos(tm * 0.85 + ph * 0.6) * 0.9 + Math.cos(tm * 1.7 + ph * 2.3) * 0.3) * SA;
     }
     ctx.globalAlpha = treeOpacity;
     const half = dotR + 1.5, sz = half * 2;
@@ -2048,6 +2058,7 @@ function loop(t = 0) {
   // Blooms
   ctx.globalAlpha = dotOpacityScroll;
   for (const b of state.blooms) b.draw(t, view.scale);
+  if (LITE && state.page === 'map') { ctx.globalAlpha = 1; drawUserLoc(t); }   // phones: your live position
   ctx.globalAlpha = 1;
 
   ctx.restore();
@@ -2249,7 +2260,8 @@ mapStage.addEventListener('touchstart', (e) => {
   if (state.page !== 'map') return;
   if (e.touches.length === 1) {
     const t = e.touches[0];
-    touchGesture = { mode: 'pan', x: t.clientX, y: t.clientY, vx: view.targetX, vy: view.targetY, t0: Date.now(), moved: false };
+    flingVX = flingVY = 0;
+    touchGesture = { mode: 'pan', x: t.clientX, y: t.clientY, vx: view.targetX, vy: view.targetY, t0: Date.now(), moved: false, samples: [] };
   } else if (e.touches.length === 2) {
     const [a, b] = e.touches;
     touchGesture = { mode: 'pinch', d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, s0: view.targetScale, moved: true };
@@ -2262,13 +2274,15 @@ mapStage.addEventListener('touchmove', (e) => {
   if (touchGesture.mode === 'pan' && e.touches.length === 1) {
     const t = e.touches[0];
     const dx = t.clientX - touchGesture.x, dy = t.clientY - touchGesture.y;
-    if (Math.abs(dx) + Math.abs(dy) > 8) { touchGesture.moved = true; card.classList.remove('visible'); }
-    view.targetX = touchGesture.vx - dx / view.scale;
-    view.targetY = touchGesture.vy - dy / view.scale;
+    if (Math.abs(dx) + Math.abs(dy) > (LITE ? 4 : 8)) { touchGesture.moved = true; card.classList.remove('visible'); }   // phones: a small move already counts as a drag
+    const PG = LITE ? 1.6 : 1;   // phones: the map travels further than the finger, so a short drag goes a long way
+    view.targetX = touchGesture.vx - dx * PG / view.scale;
+    view.targetY = touchGesture.vy - dy * PG / view.scale;
+    if (touchGesture.samples) { touchGesture.samples.push({ t: performance.now(), x: view.targetX, y: view.targetY }); if (touchGesture.samples.length > 6) touchGesture.samples.shift(); }
   } else if (touchGesture.mode === 'pinch' && e.touches.length === 2) {
     const [a, b] = e.touches;
     const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    view.targetScale = Math.max(0.4, Math.min(20, touchGesture.s0 * d / touchGesture.d0));
+    view.targetScale = Math.max(0.4, Math.min(20, touchGesture.s0 * Math.pow(d / touchGesture.d0, LITE ? 1.6 : 1)));   // phones: pinch in and out travel further, zooming out too
   }
 }, { passive: false });
 mapStage.addEventListener('touchend', (e) => {
@@ -2276,6 +2290,10 @@ mapStage.addEventListener('touchend', (e) => {
   const g = touchGesture;
   if (e.touches.length === 0) {
     touchGesture = null;
+    if (LITE && g.mode === 'pan' && g.moved && g.samples && g.samples.length >= 2) {   // flick: keep the speed of the last moment of the drag
+      const a = g.samples[0], b = g.samples[g.samples.length - 1], dt = b.t - a.t;
+      if (dt > 0 && performance.now() - b.t < 90) { const cap = 9 / view.scale; flingVX = Math.max(-cap, Math.min(cap, (b.x - a.x) / dt)); flingVY = Math.max(-cap, Math.min(cap, (b.y - a.y) / dt)); }
+    }
     if (g.mode === 'pan' && !g.moved && Date.now() - g.t0 < 450) {
       e.preventDefault();            // it was a tap, not a drag
       applyHover(g.x, g.y, true);
@@ -2304,6 +2322,7 @@ function goTo(pageId) {
   // Clicking Map while already on Map: do nothing
   if (state.page === 'map' && pageId === 'map') return;
 
+  if (pageId === 'map') { try { startLiveLocation(); centerOnUser(); } catch (e) {} }
   if (pageId === 'map' && state.page === 'flow') { wheelLockUntil = performance.now() + 2500; lastWheelAt = 0; }
   state.page = pageId;
   if (pageId === 'index') requestAnimationFrame(() => fitIndexColumns());
@@ -2633,6 +2652,24 @@ function shuffleArray(arr) {
   return a;
 }
 
+/* Phones (no hover): every grid video that is on screen plays; the ones that scroll away stop. At most 9 play at once (the ones nearest the middle) so the phone stays smooth. */
+let _gridIO = null; const _gridInView = new Set();
+function gridPlayObserver() {
+  if (_gridIO) return _gridIO;
+  const balance = () => {
+    const mid = window.innerHeight / 2;
+    const cells = [..._gridInView].filter(c => c.isConnected).sort((a, b) => Math.abs(a.getBoundingClientRect().top + a.offsetHeight / 2 - mid) - Math.abs(b.getBoundingClientRect().top + b.offsetHeight / 2 - mid));
+    cells.forEach((c, i) => { if (i < 9) { if (!c._vOn) { c._vOn = true; c._startVid(); } } else if (c._vOn) { c._vOn = false; c._stopVid(); } });
+  };
+  _gridIO = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (en.isIntersecting) _gridInView.add(en.target);
+      else { _gridInView.delete(en.target); if (en.target._vOn) { en.target._vOn = false; en.target._stopVid(); } }
+    }
+    balance();
+  }, { root: document.getElementById('page-grid'), threshold: 0.5 });
+  return _gridIO;
+}
 function buildGrid() {
   const container = document.getElementById('grid-cells');
   container.innerHTML = '';
@@ -2681,7 +2718,7 @@ function buildGrid() {
         if (hoverActive) video.classList.add('ready');
       });
     }
-    cell.addEventListener('mouseenter', () => {
+    const startVid = () => {
       if (!video) return;
       hoverActive = true;
       if (!video.src) {
@@ -2691,13 +2728,16 @@ function buildGrid() {
       const tryPlay = () => { if (hoverActive) video.play().catch(()=>{}); };
       if (video.readyState >= 2) tryPlay();
       else video.addEventListener('canplay', tryPlay, { once: true });
-    });
-    cell.addEventListener('mouseleave', () => {
+    };
+    const stopVid = () => {
       if (!video) return;
       hoverActive = false;
       video.classList.remove('ready');  // hide video, image shows again — no white gap
       video.pause();
-    });
+    };
+    cell.addEventListener('mouseenter', startVid);
+    cell.addEventListener('mouseleave', stopVid);
+    if (LITE && video) { cell._startVid = startVid; cell._stopVid = stopVid; gridPlayObserver().observe(cell); }   // phones: no hover, so whatever is on screen plays
     cell.addEventListener('mouseenter', () => {
       cursor.classList.add('dragging'); // solid cursor on hover
       cell.classList.add('is-hovered');
@@ -3155,7 +3195,42 @@ function askLocationOnce() {
     view.targetX = p.x; view.targetY = p.y;
   }, () => {}, { timeout: 8000, maximumAge: 600000 });
 }
-window.addEventListener('load', () => setTimeout(askLocationOnce, 1500));
+window.addEventListener('load', () => setTimeout(() => { if (!LITE) askLocationOnce(); }, 1500));
+
+/* Phones: live location. A light-blue dot shows where you are, with a ring that grows out of it and fades (like a GPS dot), over and over. */
+let userLoc = null, userCentered = false, geoWatch = null;
+function inNYC(lat, lon) { return lat >= 40.49 && lat <= 40.92 && lon >= -74.27 && lon <= -73.68; }
+function centerOnUser() {
+  if (!userLoc || userCentered || !userLoc.nyc) return;
+  userCentered = true;
+  view.targetX = userLoc.wx; view.targetY = userLoc.wy;
+}
+function startLiveLocation() {
+  if (!LITE || geoWatch !== null || !navigator.geolocation) return;
+  if (document.documentElement.classList.contains('hold') || window.top !== window) return;
+  try {
+    geoWatch = navigator.geolocation.watchPosition((pos) => {
+      const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+      const p = project(lat, lon);
+      userLoc = { wx: p.x, wy: p.y, acc: accuracy, nyc: inNYC(lat, lon) };
+      if (state.page === 'map') centerOnUser();
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 4000, timeout: 20000 });
+  } catch (e) {}
+}
+function drawUserLoc(t) {
+  if (!userLoc) return;
+  const x = (userLoc.wx - view.x) * view.scale + W / 2, y = (userLoc.wy - view.y) * view.scale + H / 2;
+  if (x < -80 || x > W + 80 || y < -80 || y > H + 80) return;
+  for (let k = 0; k < 2; k++) {   // two rings, half a cycle apart: stroke only, growing out and fading away
+    const ph = ((t / 2600) + k * 0.5) % 1;
+    ctx.beginPath(); ctx.arc(x, y, 8 + ph * 44, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(183,206,255,' + (0.95 * Math.pow(1 - ph, 1.3)).toFixed(3) + ')';
+    ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#B7CEFF'; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+}
 
 init();
 
