@@ -1902,7 +1902,7 @@ class Bloom {
     x += swayX; y += swayY;
     this._lastDrawX = x; this._lastDrawY = y;
     // phones: bigger, and the dark dots breathe (grow and shrink slowly) so they read as different from the rest
-    const baseR = LITE ? 4.6 * (1 + 0.2 * Math.sin(t * 0.002 + this.seed)) : 2.85;
+    const baseR = LITE ? 4.6 * (1 + 0.09 * Math.sin(t * 0.00125 + this.seed)) : 2.85;
     const targetGrow = (currentHoverBloom === this) ? 2 : 0;
     this._growth = (this._growth ?? 0) + (targetGrow - (this._growth ?? 0)) * 0.18;
     const dotR = baseR + this._growth;
