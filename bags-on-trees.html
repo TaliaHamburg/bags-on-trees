@@ -2350,6 +2350,7 @@ function goTo(pageId) {
   if (state.page === 'map' && pageId === 'map') return;
 
   if (pageId === 'map') { try { startLiveLocation(); centerOnUser(); } catch (e) {} }
+  setTimeout(scheduleGridPlayback, 350);   // phones: start/stop the grid videos when the grid opens or closes
   if (pageId === 'map' && state.page === 'flow') { wheelLockUntil = performance.now() + 2500; lastWheelAt = 0; }
   state.page = pageId;
   if (pageId === 'index') requestAnimationFrame(() => fitIndexColumns());
@@ -2681,24 +2682,26 @@ function shuffleArray(arr) {
   return a;
 }
 
-/* Phones (no hover): every grid video that is on screen plays; the ones that scroll away stop. At most 9 play at once (the ones nearest the middle) so the phone stays smooth. */
-let _gridIO = null; const _gridInView = new Set();
-function gridPlayObserver() {
-  if (_gridIO) return _gridIO;
-  const balance = () => {
-    const mid = window.innerHeight / 2;
-    const cells = [..._gridInView].filter(c => c.isConnected).sort((a, b) => Math.abs(a.getBoundingClientRect().top + a.offsetHeight / 2 - mid) - Math.abs(b.getBoundingClientRect().top + b.offsetHeight / 2 - mid));
-    cells.forEach((c, i) => { if (i < 9) { if (!c._vOn) { c._vOn = true; c._startVid(); } } else if (c._vOn) { c._vOn = false; c._stopVid(); } });
-  };
-  _gridIO = new IntersectionObserver((entries) => {
-    for (const en of entries) {
-      if (en.isIntersecting) _gridInView.add(en.target);
-      else { _gridInView.delete(en.target); if (en.target._vOn) { en.target._vOn = false; en.target._stopVid(); } }
-    }
-    balance();
-  }, { root: document.getElementById('page-grid'), threshold: 0.5 });
-  return _gridIO;
+/* Phones (no hover): every grid video that is at least half on screen plays; the ones that scroll away stop. At most 9 play at once (the ones nearest the middle) so the phone stays smooth.
+   Works from the scroll position itself (no observer), so it behaves the same in every browser. */
+let _gridPlayRaf = 0;
+function updateGridPlayback() {
+  _gridPlayRaf = 0;
+  if (!LITE || state.page !== 'grid') { document.querySelectorAll('.grid-cell').forEach(c => { if (c._vOn) { c._vOn = false; c._stopVid && c._stopVid(); } }); return; }
+  const mid = window.innerHeight / 2, vis = [];
+  for (const c of document.querySelectorAll('.grid-cell')) {
+    if (!c._startVid) continue;
+    const r = c.getBoundingClientRect(), h = Math.max(1, r.height);
+    const seen = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+    if (seen / h >= 0.5) vis.push([Math.abs(r.top + h / 2 - mid), c]);
+    else if (c._vOn) { c._vOn = false; c._stopVid(); }
+  }
+  vis.sort((x, y) => x[0] - y[0]);
+  vis.forEach(([, c], i) => { if (i < 9) { if (!c._vOn) { c._vOn = true; c._startVid(); } } else if (c._vOn) { c._vOn = false; c._stopVid(); } });
 }
+function scheduleGridPlayback() { if (!_gridPlayRaf) _gridPlayRaf = requestAnimationFrame(updateGridPlayback); }
+document.getElementById('page-grid').addEventListener('scroll', scheduleGridPlayback, { passive: true });
+window.addEventListener('resize', scheduleGridPlayback);
 function buildGrid() {
   const container = document.getElementById('grid-cells');
   container.innerHTML = '';
@@ -2766,7 +2769,7 @@ function buildGrid() {
     };
     cell.addEventListener('mouseenter', startVid);
     cell.addEventListener('mouseleave', stopVid);
-    if (LITE && video) { cell._startVid = startVid; cell._stopVid = stopVid; gridPlayObserver().observe(cell); }   // phones: no hover, so whatever is on screen plays
+    if (LITE && video) { cell._startVid = startVid; cell._stopVid = stopVid; }   // phones: no hover, so whatever is on screen plays (see updateGridPlayback)
     cell.addEventListener('mouseenter', () => {
       cursor.classList.add('dragging'); // solid cursor on hover
       cell.classList.add('is-hovered');
@@ -2778,6 +2781,7 @@ function buildGrid() {
     cell.addEventListener('click', () => openGridCellOnMap(cell, entry));
     container.appendChild(cell);
   }
+  setTimeout(scheduleGridPlayback, 300);
 }
 
 
