@@ -767,7 +767,7 @@
     /* Grid: one wide tile per row; labels wrap instead of overflowing */
     #page-grid .container { padding: 4.5rem 1.25rem 1.5rem; }
     .grid { margin-top: 0.5rem; }
-    .grid-cell-meta { gap: 0.6rem; font-size: 0.85rem; padding-bottom: 0.15rem; }
+    .grid-cell-meta { gap: 0.6rem; font-size: 0.85rem; padding-bottom: 0.1rem; margin-bottom: 0.25rem; }   /* street, date, time and the line sit right on top of their picture */
   }
 
   /* Owner notice (only shown when the page is opened with ?owner) */
@@ -2077,7 +2077,7 @@ function loop(t = 0) {
   // Blooms
   ctx.globalAlpha = dotOpacityScroll;
   for (const b of state.blooms) b.draw(t, view.scale);
-  if (LITE && state.page === 'map') { ctx.globalAlpha = 1; drawUserLoc(t); }   // phones: your live position
+  if (LITE) { ctx.globalAlpha = dotOpacityScroll; drawUserLoc(t); }   // phones: your live position (fades in with the map)
   ctx.globalAlpha = 1;
 
   ctx.restore();
@@ -2315,6 +2315,14 @@ mapStage.addEventListener('touchend', (e) => {
     }
     if (g.mode === 'pan' && !g.moved && Date.now() - g.t0 < 450) {
       e.preventDefault();            // it was a tap, not a drag
+      if (LITE && userLoc) {   // tapping your own location dot zooms right in on it
+        const ux = (userLoc.wx - view.x) * view.scale + W / 2, uy = (userLoc.wy - view.y) * view.scale + H / 2;
+        if (Math.hypot(g.x - ux, g.y - uy) < 36) {
+          flingVX = flingVY = 0; view.targetX = userLoc.wx; view.targetY = userLoc.wy;
+          view.targetScale = Math.min(20, Math.max(view.targetScale * 2.4, 9));
+          return;
+        }
+      }
       applyHover(g.x, g.y, true);
     }
   } else if (e.touches.length === 1) {
@@ -2498,7 +2506,9 @@ function applyScrollProgress() {
   // then ramp from 50% → 100% across the remaining scroll.
   if (window.innerWidth <= 700) {
     // phones: no dots while the text is being read; they fade in as the last paragraph finishes
-    dotOpacityScroll = e < 0.8 ? 0 : Math.min(1, (e - 0.8) / 0.2);
+    const kf = Math.max(0, Math.min(1, (e - 0.5) / 0.45));   // the map (dots) fades in slowly through the second half of the entrance
+    dotOpacityScroll = kf * kf * (3 - 2 * kf);
+    if (e >= 0.97) { try { startLiveLocation(); } catch (err) {} }   // end of the scroll: the location permission pop-up comes now, then the map is yours
   } else if (e < 0.68) {
     dotOpacityScroll = 0.5;
   } else {
@@ -3232,7 +3242,7 @@ function startLiveLocation() {
       const { latitude: lat, longitude: lon, accuracy } = pos.coords;
       const p = project(lat, lon);
       userLoc = { wx: p.x, wy: p.y, acc: accuracy, nyc: inNYC(lat, lon) };
-      if (state.page === 'map') centerOnUser();
+      centerOnUser();   // the map opens on you (once)
     }, () => {}, { enableHighAccuracy: true, maximumAge: 4000, timeout: 20000 });
   } catch (e) {}
 }
@@ -3247,8 +3257,7 @@ function drawUserLoc(t) {
     ctx.lineWidth = 2; ctx.stroke();
   }
   ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
-  ctx.fillStyle = '#B7CEFF'; ctx.fill();
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#B7CEFF'; ctx.fill();   // plain light-blue dot, no outline
 }
 
 init();
