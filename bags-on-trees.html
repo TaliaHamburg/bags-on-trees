@@ -1120,7 +1120,7 @@ function blockToEntry(block) {
 
 // Bags are fetched live on every visit (one small request) so a new video shows up
 // the moment it is added to Are.na. The last good copy is kept as a fallback.
-async function fetchArena() {
+async function fetchArenaRaw() {
   const PER = 100;
   const snapPromise = fetch(DATA.bagsSnapshot + '?_=' + Math.floor(Date.now() / 60000), { cache: 'no-cache' })   // asked at the same time as Are.na
     .then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -1190,6 +1190,24 @@ async function fetchArena() {
     } catch (_) {}
     return [];
   }
+}
+
+/* Videos added by the fast pipeline (tools/add-bag.mjs) live in local-bags.json next to this page. They are merged in with
+   the Are.na bags; if Are.na has a block with the same title, Are.na's wins, so nothing shows twice. */
+async function fetchArena() {
+  const [arena, local] = await Promise.all([
+    fetchArenaRaw(),
+    fetch('local-bags.json?_=' + Math.floor(Date.now() / 60000), { cache: 'no-cache' }).then(r => (r.ok ? r.json() : [])).catch(() => []),
+  ]);
+  try {
+    const titles = new Set(arena.map(e => String(e.title)));
+    for (const l of local) {
+      if (titles.has(String(l.title))) continue;
+      const [y, mo, d] = l.date.split('-').map(Number), [h, mi] = l.time.split(':').map(Number);
+      arena.push({ id: l.id, title: l.title, lat: l.lat, lon: l.lon, hour: h + mi / 60, date: new Date(y, mo - 1, d, h, mi), address: l.address, videoUrl: l.video, imageUrl: l.image });
+    }
+  } catch (e) { console.warn('[local] could not merge local-bags.json', e.message); }
+  return arena;
 }
 
 /* ════════════════════════════════════════════════════════════

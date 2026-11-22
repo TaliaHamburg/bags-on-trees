@@ -1,0 +1,24 @@
+[
+  {
+    "id": "local-5402",
+    "title": "5402",
+    "date": "2026-11-21",
+    "time": "13:42",
+    "lat": 40.7184,
+    "lon": -73.9637,
+    "address": "184 Kent Ave, Brooklyn, NY",
+    "video": "videos/IMG_5402.mp4",
+    "image": "videos/IMG_5402.jpg"
+  },
+  {
+    "id": "local-5420",
+    "title": "5420",
+    "date": "2026-11-21",
+    "time": "22:09",
+    "lat": 40.7142,
+    "lon": -73.9509,
+    "address": "Metropolitan Ave, Brooklyn, NY",
+    "video": "videos/IMG_5420.mp4",
+    "image": "videos/IMG_5420.jpg"
+  }
+]
