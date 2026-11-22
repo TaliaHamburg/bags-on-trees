@@ -2699,7 +2699,7 @@ function updateGridPlayback() {
   vis.sort((x, y) => x[0] - y[0]);
   vis.forEach(([, c], i) => { if (i < 9) { if (!c._vOn) { c._vOn = true; c._startVid(); } } else if (c._vOn) { c._vOn = false; c._stopVid(); } });
 }
-function scheduleGridPlayback() { if (!_gridPlayRaf) _gridPlayRaf = requestAnimationFrame(updateGridPlayback); }
+function scheduleGridPlayback() { if (!_gridPlayRaf) _gridPlayRaf = setTimeout(updateGridPlayback, 60); }
 document.getElementById('page-grid').addEventListener('scroll', scheduleGridPlayback, { passive: true });
 window.addEventListener('resize', scheduleGridPlayback);
 function buildGrid() {
