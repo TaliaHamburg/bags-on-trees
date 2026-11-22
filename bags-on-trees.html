@@ -1896,13 +1896,13 @@ class Bloom {
   draw(t, scale) {
     let { x, y } = this.screenPos();
     if (x < -300 || x > W + 300 || y < -300 || y > H + 300) return;
-    const time = t * (LITE ? 0.0006 : 0.0009), sa = LITE ? 1.6 : 1;
-    const swayX = (Math.sin(time + this.seed * 0.3) * 2.4 + Math.sin(time * 2.1 + this.seed) * 0.8) * sa;
-    const swayY = (Math.cos(time * 0.85 + this.seed * 0.5) * 2.0 + Math.cos(time * 1.7 + this.seed * 2) * 0.6) * sa;
+    const time = t * (LITE ? 0.00032 : 0.0009), sa = LITE ? 1.6 : 1, h2 = LITE ? 0.08 : 1;
+    const swayX = (Math.sin(time + this.seed * 0.3) * 2.4 + Math.sin(time * 2.1 + this.seed) * 0.8 * h2) * sa;
+    const swayY = (Math.cos(time * 0.85 + this.seed * 0.5) * 2.0 + Math.cos(time * 1.7 + this.seed * 2) * 0.6 * h2) * sa;
     x += swayX; y += swayY;
     this._lastDrawX = x; this._lastDrawY = y;
     // phones: bigger, and the dark dots breathe (grow and shrink slowly) so they read as different from the rest
-    const baseR = LITE ? 4.6 * (1 + 0.22 * Math.sin(t * 0.0028 + this.seed)) : 2.85;
+    const baseR = LITE ? 4.6 * (1 + 0.2 * Math.sin(t * 0.002 + this.seed)) : 2.85;
     const targetGrow = (currentHoverBloom === this) ? 2 : 0;
     this._growth = (this._growth ?? 0) + (targetGrow - (this._growth ?? 0)) * 0.18;
     const dotR = baseR + this._growth;
@@ -2053,11 +2053,11 @@ function loop(t = 0) {
     const dotR = LITE ? 4.2 : 2.85;   // phones: larger dots
     // Every tree breathes a little (the bag trees sway more). 256 phase slots are recomputed once per frame;
     // each tree picks one by position, so it costs almost nothing across hundreds of thousands of dots.
-    const tm = t * (LITE ? 0.0006 : 0.0009), SA = LITE ? 1.7 : 1;   // phones: slower and larger sway
+    const tm = t * (LITE ? 0.00032 : 0.0009), SA = LITE ? 1.7 : 1, H2 = LITE ? 0.08 : 1;   // phones: much slower, and almost only the one smooth wave (the quick second wave is what made them jiggle)
     for (let i = 0; i < 256; i++) {
       const ph = i * 2.399963;
-      SWAY_X[i] = (Math.sin(tm + ph) * 1.0 + Math.sin(tm * 2.1 + ph * 1.7) * 0.35) * SA;
-      SWAY_Y[i] = (Math.cos(tm * 0.85 + ph * 0.6) * 0.9 + Math.cos(tm * 1.7 + ph * 2.3) * 0.3) * SA;
+      SWAY_X[i] = (Math.sin(tm + ph) * 1.0 + Math.sin(tm * 2.1 + ph * 1.7) * 0.35 * H2) * SA;
+      SWAY_Y[i] = (Math.cos(tm * 0.85 + ph * 0.6) * 0.9 + Math.cos(tm * 1.7 + ph * 2.3) * 0.3 * H2) * SA;
     }
     ctx.globalAlpha = treeOpacity;
     const half = dotR + 1.5, sz = half * 2;
