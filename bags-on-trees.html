@@ -3254,11 +3254,11 @@ function drawUserLoc(t) {
   if (!userLoc) return;
   const x = (userLoc.wx - view.x) * view.scale + W / 2, y = (userLoc.wy - view.y) * view.scale + H / 2;
   if (x < -80 || x > W + 80 || y < -80 || y > H + 80) return;
-  for (let k = 0; k < 2; k++) {   // two rings, half a cycle apart: stroke only, growing out and fading away
-    const ph = ((t / 2600) + k * 0.5) % 1;
-    ctx.beginPath(); ctx.arc(x, y, 8 + ph * 44, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(183,206,255,' + (0.95 * Math.pow(1 - ph, 1.3)).toFixed(3) + ')';
-    ctx.lineWidth = 2; ctx.stroke();
+  {   // one soft ring at a time: stroke only, growing out slowly and fading away, then the next one starts
+    const ph = (t / 4600) % 1, e = 1 - Math.pow(1 - ph, 2);   // eased out, so it slows down as it widens
+    ctx.beginPath(); ctx.arc(x, y, 8 + e * 40, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(183,206,255,' + (0.7 * Math.pow(1 - ph, 1.6)).toFixed(3) + ')';
+    ctx.lineWidth = 1.5; ctx.stroke();
   }
   ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
   ctx.fillStyle = '#B7CEFF'; ctx.fill();   // plain light-blue dot, no outline
