@@ -3252,8 +3252,9 @@ function startLiveLocation() {
   try {
     geoWatch = navigator.geolocation.watchPosition((pos) => {
       const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+      if (!inNYC(lat, lon)) { userLoc = null; return; }   // outside NYC: share the map without any location (no dot, no centering)
       const p = project(lat, lon);
-      userLoc = { wx: p.x, wy: p.y, acc: accuracy, nyc: inNYC(lat, lon) };
+      userLoc = { wx: p.x, wy: p.y, acc: accuracy, nyc: true };
       centerOnUser();   // the map opens on you (once)
     }, () => {}, { enableHighAccuracy: true, maximumAge: 4000, timeout: 20000 });
   } catch (e) {}
